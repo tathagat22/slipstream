@@ -147,6 +147,7 @@ const K_MISSES = "slip:stat:misses";
 const K_PAGES = "slip:stat:pages_cached";
 const K_ACTIVITY = "slip:activity";
 const K_DOMAINS = "slip:domains";
+const K_VERSIONS = (h: string) => `slip:ver:${h}`;
 const K_NOTES = (key: string) => `slip:notes:${key}`;
 const K_NOTES_RECENT = "slip:notes:recent";
 const K_NOTES_COUNT = "slip:stat:notes";
@@ -227,6 +228,18 @@ export async function recordSave(
     s.zincr(K_DOMAINS, domain, saved),
     s.pushCapped(K_ACTIVITY, { domain, saved, hit, at: Date.now() } as Activity, 30),
   ]);
+}
+
+// ── Content version history (substrate for cutoff-aware "what changed") ───────
+export type Version = { hash: string; at: number };
+
+export async function addVersion(urlHash: string, hash: string, at: number): Promise<void> {
+  await store().pushCapped(K_VERSIONS(urlHash), { hash, at } as Version, 20);
+}
+
+// Newest first.
+export async function getVersions(urlHash: string): Promise<Version[]> {
+  return store().listRange<Version>(K_VERSIONS(urlHash), 20);
 }
 
 // ── Collective memory (the hive brain) ───────────────────────────────────────
@@ -335,6 +348,16 @@ export async function flagNote(id: string): Promise<number> {
 export async function getRecentNotes(limit = 10): Promise<Note[]> {
   const raw = await store().listRange<Note>(K_NOTES_RECENT, 30);
   return (await rankNotes(raw)).slice(0, limit);
+}
+
+// Trusted, visible notes on a target created after a cutoff timestamp.
+export async function getNotesSince(
+  target: string,
+  sinceMs: number,
+  limit = 20,
+): Promise<Note[]> {
+  const all = await getNotes(target, 50);
+  return all.filter((n) => n.at > sinceMs).slice(0, limit);
 }
 
 // Sliding-window rate limit shared across all serverless invocations.

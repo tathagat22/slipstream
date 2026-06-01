@@ -5,6 +5,7 @@ import TurndownService from "turndown";
 import { estimateTokens } from "./tokens";
 import { assertHtmlLike, readCapped, safeFetch } from "./security";
 import {
+  addVersion,
   type CachedPage,
   getCachedPage,
   getNotes,
@@ -305,6 +306,13 @@ export async function distill(
     contentHash: contentHashOf(fullMarkdown),
   };
   await putCachedPage(hash, page, !cached);
+
+  // Record a version snapshot when the content is new or has changed — this is
+  // the substrate Feature C (cutoff-aware "what changed") reads from.
+  const newHash = page.contentHash ?? contentHashOf(page.markdown);
+  if (!cached || cached.contentHash !== newHash) {
+    await addVersion(hash, newHash, page.createdAt);
+  }
 
   const r = await finalize(page, opts, false, false, hash);
   if (!r.unchanged) await recordSave(r.tokensSaved, false, url);
