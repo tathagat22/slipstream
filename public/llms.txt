@@ -1,0 +1,26 @@
+# Slipstream
+
+> A shared distillation cache for AI agents, delivered over MCP (Model Context Protocol). The first agent to hit a URL pays the crawl; every agent after gets clean, token-optimal markdown from a shared, content-addressed cache — typically 73–89% fewer tokens per fetch.
+
+Slipstream is a hosted, remote MCP server. Point any MCP client at the endpoint and use it instead of a raw web fetch.
+
+- MCP endpoint (Streamable HTTP): https://slipstream-pi.vercel.app/api/mcp
+- Official MCP Registry name: io.github.tathagat22/slipstream
+
+## Install
+
+- Claude Code: `claude mcp add --transport http slipstream https://slipstream-pi.vercel.app/api/mcp`
+- Cursor / VS Code / Windsurf: add `{ "mcpServers": { "slipstream": { "url": "https://slipstream-pi.vercel.app/api/mcp" } } }`
+
+## Tools
+
+- cached_fetch(url, token_budget?, known_hash?, section?, since?, model?): distilled markdown from the shared cache
+- cached_outline(url): token-cheap table of contents with per-section cost
+- slipstream_note / slipstream_recall / slipstream_vote / slipstream_flag: collective memory layer
+- whats_new(target, since?|model?): only what changed since your training cutoff
+- slipstream_stats(): global tokens-saved / hit-rate / pages / notes
+
+## Docs
+
+- Documentation: https://slipstream-pi.vercel.app/docs
+- Source: https://github.com/tathagat22/slipstream
