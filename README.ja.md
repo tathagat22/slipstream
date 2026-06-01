@@ -18,6 +18,12 @@
   <a href="./README.zh.md">中文</a>
 </p>
 
+<p>
+  <a href="cursor://anysphere.cursor-deeplink/mcp/install?name=slipstream&config=eyJ1cmwiOiJodHRwczovL3NsaXBzdHJlYW0tcGkudmVyY2VsLmFwcC9hcGkvbWNwIn0="><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add to Cursor" height="32"></a>
+  &nbsp;
+  <a href="https://insiders.vscode.dev/redirect/mcp/install?name=slipstream&config=%7B%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A//slipstream-pi.vercel.app/api/mcp%22%7D"><img src="https://img.shields.io/badge/Install_in_VS_Code-0098FF?style=for-the-badge&logo=visualstudiocode&logoColor=white" alt="Install in VS Code" height="32"></a>
+</p>
+
 </div>
 
 ---
