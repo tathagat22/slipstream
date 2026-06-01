@@ -288,6 +288,35 @@ h2 {
   padding: 24px 12px;
 }
 
+.hive {
+  margin: 44px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  background: linear-gradient(180deg, #11141e, #0c0e16);
+}
+.hivesub {
+  color: var(--muted);
+  font-size: 15px;
+  max-width: 640px;
+  margin: -4px 0 18px;
+}
+.hivesub strong {
+  color: var(--accent);
+}
+.tag.gotcha {
+  color: #fca5a5;
+  background: #ef444418;
+}
+.tag.correction {
+  color: var(--warn);
+  background: #fbbf2418;
+}
+.tag.tip {
+  color: var(--good);
+  background: #5eead418;
+}
+
 .how {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
