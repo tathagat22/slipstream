@@ -42,6 +42,23 @@ const NOISE_SELECTORS =
   ".cookie, .cookies, .advertisement, .ad, .ads, .promo, .newsletter, " +
   ".social, .share, .related, .comments, [aria-hidden=true]";
 
+// Main-content containers, in priority order. Selecting one of these preserves
+// the heading structure (h2/h3) that Readability tends to strip — and that
+// outline/section depend on.
+const MAIN_SELECTORS = [
+  "main",
+  "article",
+  "[role=main]",
+  ".mw-parser-output", // Wikipedia / MediaWiki
+  ".markdown-body", // GitHub
+  ".prose", // common docs (Tailwind)
+  "#content",
+  "#main-content",
+  ".content",
+  ".post",
+  ".article",
+];
+
 export type DistillOptions = {
   tokenBudget?: number;
   knownHash?: string; // delta: if it matches, return ~nothing
@@ -71,12 +88,24 @@ function htmlToDistilledMarkdown(html: string, url: string): string {
   const doc = dom.window.document;
   doc.querySelectorAll(NOISE_SELECTORS).forEach((el) => el.remove());
 
+  // Prefer an explicit main-content container — it keeps heading structure.
   let contentHtml: string | null = null;
-  try {
-    const article = new Readability(doc).parse();
-    if (article?.content) contentHtml = article.content;
-  } catch {
-    /* fall through to body */
+  for (const sel of MAIN_SELECTORS) {
+    const el = doc.querySelector(sel);
+    if (el && (el.textContent ?? "").trim().length > 500) {
+      contentHtml = el.innerHTML;
+      break;
+    }
+  }
+
+  // Fallback: Readability (great prose extraction, but flattens headings).
+  if (!contentHtml) {
+    try {
+      const article = new Readability(doc).parse();
+      if (article?.content) contentHtml = article.content;
+    } catch {
+      /* fall through to body */
+    }
   }
   if (!contentHtml) contentHtml = doc.body?.innerHTML ?? html;
 
@@ -101,7 +130,7 @@ function splitSections(markdown: string): { heading: string; level: number; body
   const sections: { heading: string; level: number; body: string }[] = [];
   let cur = { heading: "(intro)", level: 0, body: "" };
   for (const line of lines) {
-    const m = /^(#{1,3})\s+(.*)$/.exec(line);
+    const m = /^(#{1,6})\s+(.*)$/.exec(line);
     if (m) {
       if (cur.body.trim() || cur.heading !== "(intro)") sections.push(cur);
       cur = { heading: m[2].trim(), level: m[1].length, body: `${line}\n` };
@@ -115,7 +144,7 @@ function splitSections(markdown: string): { heading: string; level: number; body
 
 export function outlineOf(markdown: string): OutlineItem[] {
   return splitSections(markdown)
-    .filter((s) => s.heading !== "(intro)")
+    .filter((s) => s.heading !== "(intro)" && s.level <= 3)
     .map((s) => ({
       heading: s.heading,
       level: s.level,
