@@ -154,11 +154,23 @@ export function outlineOf(markdown: string): OutlineItem[] {
 
 function extractSection(markdown: string, query: string): string | null {
   const q = query.toLowerCase().trim();
-  const sections = splitSections(markdown);
-  const hit =
-    sections.find((s) => s.heading.toLowerCase() === q) ??
-    sections.find((s) => s.heading.toLowerCase().includes(q));
-  return hit ? hit.body.trim() : null;
+  const lines = markdown.split("\n");
+  const headings = lines
+    .map((line, i) => {
+      const m = /^(#{1,6})\s+(.*)$/.exec(line);
+      return m ? { i, level: m[1].length, text: m[2].trim().toLowerCase() } : null;
+    })
+    .filter((h): h is { i: number; level: number; text: string } => h !== null);
+
+  const start =
+    headings.find((h) => h.text === q) ?? headings.find((h) => h.text.includes(q));
+  if (!start) return null;
+
+  // Include everything until the next heading of the same or higher level —
+  // so a parent section carries its subsections with it.
+  const next = headings.find((h) => h.i > start.i && h.level <= start.level);
+  const body = lines.slice(start.i, next ? next.i : undefined).join("\n");
+  return body.trim();
 }
 
 async function crawl(
