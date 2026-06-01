@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Redis } from "@upstash/redis";
+import { normalizeForDedup } from "./security";
 
 // ── Storage backend ─────────────────────────────────────────────────────────
 // Production: Upstash Redis (shared across every serverless invocation = a real
@@ -16,6 +17,7 @@ type Store = {
   listRange<T>(key: string, count: number): Promise<T[]>;
   zincr(key: string, member: string, amount: number): Promise<void>;
   ztop(key: string, count: number): Promise<ZMember[]>;
+  incrTtl(key: string, ttlSec: number): Promise<number>;
 };
 
 function makeRedisStore(redis: Redis): Store {
@@ -54,6 +56,11 @@ function makeRedisStore(redis: Redis): Store {
       }
       return out;
     },
+    async incrTtl(key, ttlSec) {
+      const n = await redis.incr(key);
+      if (n === 1) await redis.expire(key, ttlSec);
+      return n;
+    },
   };
 }
 
@@ -61,6 +68,7 @@ function makeMemoryStore(): Store {
   const kv = new Map<string, unknown>();
   const lists = new Map<string, unknown[]>();
   const zsets = new Map<string, Map<string, number>>();
+  const ttl = new Map<string, { count: number; expireAt: number }>();
   return {
     async getJSON<T>(key: string) {
       return (kv.get(key) as T) ?? null;
@@ -95,6 +103,16 @@ function makeMemoryStore(): Store {
         .map(([member, score]) => ({ member, score }))
         .sort((a, b) => b.score - a.score)
         .slice(0, count);
+    },
+    async incrTtl(key, ttlSec) {
+      const now = Date.now();
+      const rec = ttl.get(key);
+      if (!rec || rec.expireAt <= now) {
+        ttl.set(key, { count: 1, expireAt: now + ttlSec * 1000 });
+        return 1;
+      }
+      rec.count += 1;
+      return rec.count;
     },
   };
 }
@@ -133,6 +151,13 @@ const K_NOTES = (key: string) => `slip:notes:${key}`;
 const K_NOTES_RECENT = "slip:notes:recent";
 const K_NOTES_COUNT = "slip:stat:notes";
 const K_NOTE_VOTES = (id: string) => `slip:nv:${id}`;
+const K_NOTE_FLAGS = (id: string) => `slip:nf:${id}`;
+const K_RL = (action: string, client: string) => `slip:rl:${action}:${client}`;
+
+// A note is hidden once enough agents distrust it.
+const HIDE_NET = -3;
+const HIDE_FLAGS = 5;
+const DECAY_HALF_LIFE_DAYS = 30;
 
 export function urlHash(url: string): string {
   let normalized = url.trim();
@@ -232,50 +257,95 @@ export function noteKey(target: string): string {
   return `t:${slug}`;
 }
 
+export type AddNoteResult = { note: Note; deduped: boolean };
+
 export async function addNote(
   target: string,
   text: string,
   kind: NoteKind,
-): Promise<Note> {
+): Promise<AddNoteResult> {
   const s = store();
+  const key = K_NOTES(noteKey(target));
+
+  // Dedup: identical advice already on this target → upvote it instead of
+  // adding a near-duplicate. Keeps the hive signal clean.
+  const norm = normalizeForDedup(text);
+  const existing = await s.listRange<Note>(key, 50);
+  const dup = existing.find((n) => normalizeForDedup(n.text) === norm);
+  if (dup) {
+    await s.incrBy(K_NOTE_VOTES(dup.id), 1);
+    return { note: dup, deduped: true };
+  }
+
   const note: Note = {
     id: randomUUID().slice(0, 8),
     target,
     kind,
-    text: text.slice(0, 1000),
+    text: text.slice(0, 500),
     votes: 1,
     at: Date.now(),
   };
   await Promise.all([
-    s.pushCapped(K_NOTES(noteKey(target)), note, 50),
+    s.pushCapped(key, note, 50),
     s.pushCapped(K_NOTES_RECENT, note, 30),
     s.incrBy(K_NOTES_COUNT, 1),
     s.incrBy(K_NOTE_VOTES(note.id), 1),
   ]);
-  return note;
+  return { note, deduped: false };
 }
 
-async function attachVotes(notes: Note[]): Promise<Note[]> {
+// Attach live vote/flag counts, drop distrusted notes, and rank by a
+// decay-weighted net score so trustworthy + recent advice rises.
+async function rankNotes(notes: Note[]): Promise<Note[]> {
   const s = store();
-  const withVotes = await Promise.all(
-    notes.map(async (n) => ({ ...n, votes: await s.get(K_NOTE_VOTES(n.id)) })),
+  const now = Date.now();
+  const scored = await Promise.all(
+    notes.map(async (n) => {
+      const [votes, flags] = await Promise.all([
+        s.get(K_NOTE_VOTES(n.id)),
+        s.get(K_NOTE_FLAGS(n.id)),
+      ]);
+      return { n: { ...n, votes }, flags, net: votes - flags };
+    }),
   );
-  // Most-trusted first, then most-recent.
-  return withVotes.sort((a, b) => b.votes - a.votes || b.at - a.at);
+  return scored
+    .filter((x) => x.net > HIDE_NET && x.flags < HIDE_FLAGS)
+    .map((x) => {
+      const ageDays = (now - x.n.at) / 86_400_000;
+      const weight = x.net * Math.pow(0.5, ageDays / DECAY_HALF_LIFE_DAYS);
+      return { ...x, weight };
+    })
+    .sort((a, b) => b.weight - a.weight || b.n.at - a.n.at)
+    .map((x) => x.n);
 }
 
 export async function getNotes(target: string, limit = 8): Promise<Note[]> {
   const raw = await store().listRange<Note>(K_NOTES(noteKey(target)), 50);
-  return (await attachVotes(raw)).slice(0, limit);
+  return (await rankNotes(raw)).slice(0, limit);
 }
 
 export async function voteNote(id: string): Promise<number> {
   return store().incrBy(K_NOTE_VOTES(id), 1);
 }
 
+export async function flagNote(id: string): Promise<number> {
+  return store().incrBy(K_NOTE_FLAGS(id), 1);
+}
+
 export async function getRecentNotes(limit = 10): Promise<Note[]> {
   const raw = await store().listRange<Note>(K_NOTES_RECENT, 30);
-  return (await attachVotes(raw)).slice(0, limit);
+  return (await rankNotes(raw)).slice(0, limit);
+}
+
+// Sliding-window rate limit shared across all serverless invocations.
+export async function rateLimit(
+  clientId: string,
+  action: string,
+  limit: number,
+  windowSec: number,
+): Promise<{ allowed: boolean; count: number; limit: number }> {
+  const count = await store().incrTtl(K_RL(action, clientId), windowSec);
+  return { allowed: count <= limit, count, limit };
 }
 
 // Pricing + tangibility for the public counter. Stated assumptions, not magic.

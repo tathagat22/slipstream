@@ -3,6 +3,7 @@ import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
 import TurndownService from "turndown";
 import { estimateTokens } from "./tokens";
+import { assertHtmlLike, readCapped, safeFetch } from "./security";
 import {
   type CachedPage,
   getCachedPage,
@@ -184,14 +185,17 @@ async function crawl(
   if (prev?.etag) headers["if-none-match"] = prev.etag;
   if (prev?.lastModified) headers["if-modified-since"] = prev.lastModified;
 
-  const res = await fetch(url, { headers, redirect: "follow" });
+  // safeFetch validates the URL + every redirect hop against SSRF and enforces
+  // timeout/redirect caps; readCapped enforces the byte cap.
+  const res = await safeFetch(url, headers);
   if (res.status === 304) return { status: 304 };
-  if (!res.ok) {
-    throw new Error(`Upstream fetch failed: ${res.status} ${res.statusText}`);
+  if (res.status >= 400) {
+    throw new Error(`Upstream fetch failed: ${res.status}`);
   }
+  assertHtmlLike(res.headers.get("content-type"));
   return {
     status: res.status,
-    html: await res.text(),
+    html: await readCapped(res),
     etag: res.headers.get("etag") ?? undefined,
     lastModified: res.headers.get("last-modified") ?? undefined,
   };
