@@ -99,17 +99,26 @@ function makeMemoryStore(): Store {
   };
 }
 
+// Accept both the native Upstash names and the KV_* names that Vercel's
+// Upstash Marketplace integration injects.
+function redisCreds(): { url?: string; token?: string } {
+  return {
+    url: process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN,
+  };
+}
+
 let _store: Store | null = null;
 function store(): Store {
   if (_store) return _store;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const { url, token } = redisCreds();
   _store = url && token ? makeRedisStore(new Redis({ url, token })) : makeMemoryStore();
   return _store;
 }
 
 export function usingSharedStore(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+  const { url, token } = redisCreds();
+  return Boolean(url && token);
 }
 
 // ── Keys ─────────────────────────────────────────────────────────────────────
