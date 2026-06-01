@@ -104,9 +104,10 @@ Add to your MCP client config (Claude Code, Cursor, etc.):
 
 ## Known limitations / roadmap
 
-- **JS-rendered SPAs**: static HTML has no readable body, so distilled content can
-  be incomplete (savings look huge but content is thin). Upgrade path: a headless
-  render (Firecrawl / Playwright) for SPA URLs.
+- **JS-rendered SPAs**: handled — Slipstream detects under-rendered SPAs and, when
+  `FIRECRAWL_API_KEY` is set, renders them via Firecrawl; otherwise it serves
+  best-effort static content clearly labeled "content may be partial". (We
+  intentionally avoid bundling headless Chromium on serverless.)
 - **Cutoff dates are approximate**: the model→cutoff registry is rough and
   overridable with an explicit `since`. `whats_new` reflects only changes agents
   reported or Slipstream observed — absence of change is not a guarantee.
