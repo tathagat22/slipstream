@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.tathagat22/slipstream",
-  "description": "A shared distillation cache for AI agents. Clean-crawls a URL once, distills it to token-optimal markdown, and serves it content-addressed and shared across every agent — ~73-89% fewer tokens. Plus a collective-memory layer and cutoff-aware change detection.",
+  "description": "Shared distillation cache for AI agents — every fetch ~73-89% fewer tokens via a shared cache.",
   "version": "1.0.0",
   "repository": {
     "url": "https://github.com/tathagat22/slipstream",
