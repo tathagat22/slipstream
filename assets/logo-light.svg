@@ -18,11 +18,11 @@
     <circle cx="78" cy="34" r="4.5" fill="#38bdf8"/>
   </g>
 
-  <!-- wordmark -->
+  <!-- wordmark (dark text, for light backgrounds) -->
   <g transform="translate(140,0)">
     <text x="0" y="62" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
           font-size="44" font-weight="700" fill="#0b1220">Slipstream</text>
     <text x="2" y="92" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
-          font-size="17" font-weight="500" fill="#64748b" letter-spacing="0.3">A shared distillation cache for AI agents</text>
+          font-size="17" font-weight="500" fill="#475569" letter-spacing="0.3">A shared distillation cache for AI agents</text>
   </g>
 </svg>

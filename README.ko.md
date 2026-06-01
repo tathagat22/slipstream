@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="./assets/logo.svg" alt="Slipstream" width="440" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-dark.svg">
+  <img src="./assets/logo-light.svg" alt="Slipstream" width="440">
+</picture>
 
 <h3>모든 에이전트가 다음 에이전트를 위해 웹을 더 저렴하게 만듭니다.</h3>
 

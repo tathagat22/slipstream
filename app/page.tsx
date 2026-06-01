@@ -123,10 +123,17 @@ export default function Home() {
   return (
     <main className="wrap">
       <header className="top">
-        <span className="brand">◢ slipstream</span>
-        <a className="ghlink" href="https://github.com/tathagat22/slipstream">
-          GitHub ↗
-        </a>
+        <span className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="brandmark" src="/mark.svg" alt="" width={24} height={24} />
+          slipstream
+        </span>
+        <nav className="topnav">
+          <a className="ghlink" href="/docs">Docs</a>
+          <a className="ghlink" href="https://github.com/tathagat22/slipstream">
+            GitHub ↗
+          </a>
+        </nav>
       </header>
 
       <span className="eyebrow">The shared cache for AI agents</span>
@@ -377,7 +384,7 @@ export default function Home() {
 
       <footer>
         <span className="dot" /> Slipstream · a shared cache that gets cheaper for
-        everyone the more it’s used. · <a href="https://github.com/tathagat22/slipstream">source</a>
+        everyone the more it’s used. · <a href="/docs">docs</a> · <a href="https://github.com/tathagat22/slipstream">source</a>
       </footer>
     </main>
   );

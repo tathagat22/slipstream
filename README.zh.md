@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="./assets/logo.svg" alt="Slipstream" width="440" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-dark.svg">
+  <img src="./assets/logo-light.svg" alt="Slipstream" width="440">
+</picture>
 
 <h3>每个智能体都让网络对下一个智能体更便宜。</h3>
 

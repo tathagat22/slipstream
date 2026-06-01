@@ -61,13 +61,28 @@ code {
   margin-bottom: 64px;
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-size: 18px;
 }
+.brandmark {
+  display: block;
+}
+.topnav {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+}
 .ghlink {
   color: var(--muted);
   font-size: 14px;
+  transition: color 0.15s ease;
+}
+.ghlink:hover {
+  color: var(--text);
 }
 
 .eyebrow {
@@ -522,4 +537,124 @@ footer {
   100% {
     box-shadow: 0 0 0 0 rgba(94, 234, 212, 0);
   }
+}
+
+/* ---- Docs page ---- */
+.doc h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 48px 0 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.doc h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 22px 0 8px;
+}
+.doc .p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 8px 0;
+  max-width: 720px;
+}
+.dochero {
+  margin-bottom: 18px;
+}
+.doclogo {
+  display: block;
+  margin-bottom: 22px;
+  max-width: 100%;
+  height: auto;
+}
+.dochero .lede {
+  margin-top: 14px;
+  max-width: 720px;
+}
+.toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 8px 0 8px;
+}
+.toc a {
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: #00000033;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.toc a:hover {
+  color: var(--text);
+  border-color: var(--accent2);
+}
+.block {
+  background: #00000040;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 8px 0;
+}
+.doc code {
+  background: #00000040;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.doctools {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.doctool {
+  background: linear-gradient(180deg, var(--panel), var(--panel2));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.doctool .dt-sig {
+  display: inline-block;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--accent2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.doctool .dt-body {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+  margin-top: 7px;
+}
+.steps,
+.bullets {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 10px 0 10px 22px;
+  max-width: 720px;
+}
+.steps li,
+.bullets li {
+  margin: 6px 0;
+}
+.doc .ilink {
+  color: var(--accent);
+}
+.doc .ilink:hover {
+  text-decoration: underline;
 }

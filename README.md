@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="./assets/logo.svg" alt="Slipstream" width="440" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-dark.svg">
+  <img src="./assets/logo-light.svg" alt="Slipstream" width="440">
+</picture>
 
 <h3>Every agent makes the web cheaper for the next.</h3>
 
