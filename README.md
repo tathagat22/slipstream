@@ -82,17 +82,42 @@ The MCP endpoint is at `http://localhost:3000/api/mcp`. With no env set,
 Slipstream runs fully in-memory — great for dev, but the cache is per-process and
 not shared. For a **real shared cache**, add Upstash Redis (see below).
 
-## Connect an agent
+## Install (30 seconds)
 
-Add to your MCP client config (Claude Code, Cursor, etc.):
+It's a hosted, remote MCP server — nothing to install or run. Point your agent at
+the URL.
+
+**Claude Code** — one line, no config files:
+
+```bash
+claude mcp add --transport http slipstream https://slipstream-pi.vercel.app/api/mcp
+```
+
+**Cursor / Windsurf / VS Code** — add to your MCP config (`mcp.json`):
 
 ```json
 {
   "mcpServers": {
-    "slipstream": { "url": "https://YOUR-DEPLOYMENT.vercel.app/api/mcp" }
+    "slipstream": { "url": "https://slipstream-pi.vercel.app/api/mcp" }
   }
 }
 ```
+
+**Claude Desktop** — bridges remote MCP via `mcp-remote`:
+
+```json
+{
+  "mcpServers": {
+    "slipstream": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://slipstream-pi.vercel.app/api/mcp"]
+    }
+  }
+}
+```
+
+That's it — your agent now has `cached_fetch`, `whats_new`, the hive-brain note
+tools, and the rest.
 
 ## Deploy (Vercel)
 

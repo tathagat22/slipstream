@@ -83,9 +83,42 @@ function ago(ts: number): string {
   return `${Math.floor(s / 3600)}h ago`;
 }
 
+const INSTALL: Record<string, { label: string; code: string }> = {
+  "claude-code": {
+    label: "Claude Code",
+    code: `claude mcp add --transport http slipstream ${MCP_URL}`,
+  },
+  cursor: {
+    label: "Cursor / Windsurf / VS Code",
+    code: `{
+  "mcpServers": {
+    "slipstream": { "url": "${MCP_URL}" }
+  }
+}`,
+  },
+  "claude-desktop": {
+    label: "Claude Desktop",
+    code: `{
+  "mcpServers": {
+    "slipstream": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "${MCP_URL}"]
+    }
+  }
+}`,
+  },
+};
+
 export default function Home() {
   const stats = useStats();
   const saved = useCountUp(stats?.tokensSaved ?? 0);
+  const [tab, setTab] = useState<keyof typeof INSTALL>("claude-code");
+  const [copied, setCopied] = useState(false);
+  const copy = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <main className="wrap">
@@ -314,12 +347,33 @@ export default function Home() {
         ))}
       </div>
 
-      <h2>Add it to your agent (30 seconds)</h2>
-      <pre>{`{
-  "mcpServers": {
-    "slipstream": { "url": "${MCP_URL}" }
-  }
-}`}</pre>
+      <h2>Install in 30 seconds</h2>
+      <div className="install">
+        <div className="tabs">
+          {Object.entries(INSTALL).map(([key, v]) => (
+            <button
+              key={key}
+              className={`tab ${tab === key ? "on" : ""}`}
+              onClick={() => setTab(key as keyof typeof INSTALL)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <div className="codewrap">
+          <button className="copy" onClick={() => copy(INSTALL[tab].code)}>
+            {copied ? "✓ copied" : "copy"}
+          </button>
+          <pre>{INSTALL[tab].code}</pre>
+        </div>
+        <p className="installnote">
+          {tab === "claude-code"
+            ? "Paste in your terminal. That's it — no config files."
+            : tab === "cursor"
+              ? "Add to the MCP settings / mcp.json for your editor."
+              : "Claude Desktop bridges remote MCP via mcp-remote (npx handles it)."}
+        </p>
+      </div>
 
       <footer>
         <span className="dot" /> Slipstream · a shared cache that gets cheaper for

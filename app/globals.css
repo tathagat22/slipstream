@@ -436,6 +436,62 @@ pre {
   margin-bottom: 40px;
 }
 
+.install {
+  margin-bottom: 40px;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tab {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.on {
+  color: #07080d;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.codewrap {
+  position: relative;
+}
+.codewrap pre {
+  margin-bottom: 12px;
+}
+.copy {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #00000055;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.copy:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.installnote {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
 footer {
   color: var(--muted);
   font-size: 13px;
