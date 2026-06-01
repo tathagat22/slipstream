@@ -4,6 +4,7 @@ import { Readability } from "@mozilla/readability";
 import TurndownService from "turndown";
 import { estimateTokens } from "./tokens";
 import { assertHtmlLike, readCapped, safeFetch } from "./security";
+import { isLikelySpa, renderJs, rendererAvailable } from "./render";
 import {
   addVersion,
   type CachedPage,
@@ -78,6 +79,8 @@ export type DistillResult = {
   unchanged: boolean; // delta short-circuit fired
   contentHash: string;
   notes: Note[];
+  renderedWith?: string;
+  spaPartial?: boolean;
   fromUrlHash: string;
 };
 
@@ -224,6 +227,8 @@ async function finalize(
       unchanged: true,
       contentHash: fullHash,
       notes: [],
+      renderedWith: page.renderedWith,
+      spaPartial: page.spaPartial,
       fromUrlHash: hash,
     };
     await recordSave(r.tokensSaved, true, page.url);
@@ -251,6 +256,8 @@ async function finalize(
     unchanged: false,
     contentHash: fullHash,
     notes,
+    renderedWith: page.renderedWith,
+    spaPartial: page.spaPartial,
     fromUrlHash: hash,
   };
 }
@@ -294,16 +301,39 @@ export async function distill(
 
   const html = fetched.html ?? "";
   const originalTokens = estimateTokens(html);
-  const fullMarkdown = htmlToDistilledMarkdown(html, url);
+  let markdown = htmlToDistilledMarkdown(html, url);
+  let origTokens = originalTokens;
+  let renderedWith: string | undefined;
+  let spaPartial = false;
+
+  // SPA handling: static HTML often has no real body. If it looks like an
+  // under-rendered SPA, render it properly (Firecrawl) — or flag it as partial.
+  if (isLikelySpa(html, originalTokens, estimateTokens(markdown))) {
+    if (rendererAvailable()) {
+      const r = await renderJs(url);
+      if (r && estimateTokens(r.markdown) > estimateTokens(markdown)) {
+        markdown = r.markdown;
+        origTokens = Math.max(originalTokens, r.rawTokens);
+        renderedWith = "firecrawl";
+      } else {
+        spaPartial = true;
+      }
+    } else {
+      spaPartial = true;
+    }
+  }
+
   const page: CachedPage = {
     url,
-    markdown: fullMarkdown,
-    originalTokens,
-    distilledTokens: estimateTokens(fullMarkdown),
+    markdown,
+    originalTokens: origTokens,
+    distilledTokens: estimateTokens(markdown),
     createdAt: Date.now(),
     etag: fetched.etag,
     lastModified: fetched.lastModified,
-    contentHash: contentHashOf(fullMarkdown),
+    contentHash: contentHashOf(markdown),
+    renderedWith,
+    spaPartial: spaPartial || undefined,
   };
   await putCachedPage(hash, page, !cached);
 

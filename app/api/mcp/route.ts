@@ -151,11 +151,16 @@ const handler = createMcpHandler(
               ? "cache HIT (revalidated 304)"
               : "cache HIT"
             : "cache MISS (now cached for the next agent)";
+          const provenance = r.renderedWith
+            ? ` · JS-rendered via ${r.renderedWith}`
+            : r.spaPartial
+              ? " · ⚠ SPA detected: content may be partial (enable FIRECRAWL_API_KEY for JS rendering)"
+              : "";
           const footer =
             `\n\n---\n_Slipstream ${state}` +
             ` · ${r.distilledTokens} tokens returned vs ~${r.originalTokens} raw` +
             ` · saved ~${r.tokensSaved} tokens (${pct}%)` +
-            ` · contentHash ${r.contentHash}_`;
+            ` · contentHash ${r.contentHash}${provenance}_`;
 
           // Feature C (ambient): if the caller declared a cutoff, lead with what
           // changed since then so a stale model self-corrects before reading.

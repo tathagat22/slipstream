@@ -189,6 +189,8 @@ export type CachedPage = {
   etag?: string;
   lastModified?: string;
   contentHash?: string;
+  renderedWith?: string; // e.g. "firecrawl" when JS-rendered
+  spaPartial?: boolean; // SPA detected but no renderer available
 };
 
 export async function getCachedPage(hash: string): Promise<CachedPage | null> {

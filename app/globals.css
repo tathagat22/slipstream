@@ -340,6 +340,54 @@ h2 {
   font-size: 14px;
 }
 
+.tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 44px;
+}
+@media (max-width: 720px) {
+  .tools {
+    grid-template-columns: 1fr;
+  }
+}
+.toolgroup {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+}
+.toolgroup .gname {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.tool {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.tool:first-of-type {
+  border-top: none;
+}
+.tname {
+  color: var(--accent2);
+  background: #00000033;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 13px;
+  align-self: flex-start;
+}
+.tdesc {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
 .compare {
   border: 1px solid var(--line);
   border-radius: 14px;
