@@ -52,12 +52,16 @@ export function isLikelySpa(
   originalTokens: number,
   distilledTokens: number,
 ): boolean {
-  if (originalTokens < 800) return false;
-  const ratio = originalTokens ? distilledTokens / originalTokens : 1;
-  const thin = distilledTokens < 200 || ratio < 0.04;
+  if (originalTokens < 1000) return false;
+  const ratio = distilledTokens / originalTokens;
   const shell =
     /<div[^>]+id=["'](root|app|__next)["']|data-reactroot|__NEXT_DATA__|window\.__NUXT__|ng-version|<div[^>]+id=["']svelte/i.test(
       html,
     );
-  return thin && shell;
+  // Lots of HTML but almost no extractable text => extraction failed (the
+  // classic SPA lie), regardless of which framework's shell it is.
+  const veryThin = ratio < 0.02 && originalTokens > 3000;
+  // A clear app shell needs less evidence of thinness.
+  const thinWithShell = (distilledTokens < 200 || ratio < 0.05) && shell;
+  return veryThin || thinWithShell;
 }
