@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+type ZMember = { member: string; score: number };
+type Activity = { domain: string; saved: number; hit: boolean; at: number };
 type Stats = {
   tokensSaved: number;
   hits: number;
@@ -9,7 +11,13 @@ type Stats = {
   pagesCached: number;
   hitRate: number;
   shared: boolean;
+  usdSaved: number;
+  booksOfText: number;
+  topDomains: ZMember[];
+  activity: Activity[];
 };
+
+const MCP_URL = "https://slipstream-pi.vercel.app/api/mcp";
 
 function useStats() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -34,36 +42,82 @@ function useStats() {
   return stats;
 }
 
-const mcpSnippet = `{
-  "mcpServers": {
-    "slipstream": {
-      "url": "https://YOUR-DEPLOYMENT.vercel.app/api/mcp"
-    }
-  }
-}`;
+/** Smoothly animate a number toward its target value. */
+function useCountUp(target: number) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef(0);
+  useEffect(() => {
+    let raf = 0;
+    const step = () => {
+      const cur = ref.current;
+      const diff = target - cur;
+      if (Math.abs(diff) < 1) {
+        ref.current = target;
+        setDisplay(target);
+        return;
+      }
+      ref.current = cur + diff * 0.12;
+      setDisplay(Math.round(ref.current));
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return display;
+}
+
+function ago(ts: number): string {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
+}
 
 export default function Home() {
   const stats = useStats();
-  const saved = stats?.tokensSaved ?? 0;
+  const saved = useCountUp(stats?.tokensSaved ?? 0);
 
   return (
     <main className="wrap">
-      <span className="eyebrow">Shared cache for AI agents</span>
-      <h1>Every agent makes the web cheaper for the next.</h1>
+      <header className="top">
+        <span className="brand">◢ slipstream</span>
+        <a className="ghlink" href="https://github.com/tathagat22/slipstream">
+          GitHub ↗
+        </a>
+      </header>
+
+      <span className="eyebrow">The shared cache for AI agents</span>
+      <h1>
+        Every agent makes the
+        <br />
+        web cheaper for the next.
+      </h1>
       <p className="lede">
-        Slipstream is a <strong>shared distillation cache</strong> for AI agents,
-        served over MCP. The first agent to hit a URL pays the crawl. Every agent
-        after drafts in its slipstream — getting clean, token-optimized markdown
-        for <strong>~90% fewer tokens</strong>.
+        AI agents re-crawl the same pages millions of times a day, burning
+        thousands of tokens to extract a few hundred. Slipstream distills a URL{" "}
+        <strong>once</strong>, then serves it — content-addressed and{" "}
+        <strong>shared across every agent on Earth</strong> — for{" "}
+        <strong>~73–89% fewer tokens.</strong>
       </p>
 
       <section className="counter">
-        <div className="label">Tokens saved for agents worldwide</div>
+        <div className="label">
+          <span className="dot" /> Tokens saved for agents worldwide
+        </div>
         <div className="big">{saved.toLocaleString()}</div>
-        <div className="sub">
-          {stats
-            ? `${(stats.hitRate * 100).toFixed(1)}% cache hit rate · live`
-            : "connecting…"}
+        <div className="cards3">
+          <div className="mini">
+            <div className="mn">${(stats?.usdSaved ?? 0).toFixed(2)}</div>
+            <div className="mk">saved · est. $3/1M tokens</div>
+          </div>
+          <div className="mini">
+            <div className="mn">{(stats?.booksOfText ?? 0).toFixed(1)}</div>
+            <div className="mk">books of text distilled away</div>
+          </div>
+          <div className="mini">
+            <div className="mn">{((stats?.hitRate ?? 0) * 100).toFixed(0)}%</div>
+            <div className="mk">cache hit rate</div>
+          </div>
         </div>
         <div className="stat-row">
           <div className="stat">
@@ -79,7 +133,54 @@ export default function Home() {
             <div className="k">cold crawls</div>
           </div>
         </div>
+        {!stats?.shared && (
+          <div className="warn">
+            in-memory dev store — add Upstash Redis to persist + share globally
+          </div>
+        )}
       </section>
+
+      <div className="twocol">
+        <section>
+          <h2>Live activity</h2>
+          <div className="feed">
+            {stats?.activity?.length ? (
+              stats.activity.map((a, i) => (
+                <div className="row" key={`${a.at}-${i}`}>
+                  <span className={`tag ${a.hit ? "hit" : "miss"}`}>
+                    {a.hit ? "HIT" : "CRAWL"}
+                  </span>
+                  <span className="dom">{a.domain}</span>
+                  <span className="sv">+{a.saved.toLocaleString()} tok</span>
+                  <span className="tm">{ago(a.at)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="empty">
+                No traffic yet — point an agent at the MCP endpoint and watch it
+                fill.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section>
+          <h2>Top domains by tokens saved</h2>
+          <div className="board">
+            {stats?.topDomains?.length ? (
+              stats.topDomains.map((d, i) => (
+                <div className="brow" key={d.member}>
+                  <span className="rank">{i + 1}</span>
+                  <span className="dom">{d.member}</span>
+                  <span className="sv">{d.score.toLocaleString()}</span>
+                </div>
+              ))
+            ) : (
+              <div className="empty">The leaderboard fills as agents fetch.</div>
+            )}
+          </div>
+        </section>
+      </div>
 
       <h2>How it works</h2>
       <div className="how">
@@ -93,8 +194,8 @@ export default function Home() {
         <div className="card">
           <div className="step">2 · Distill</div>
           <p>
-            On a miss, Slipstream clean-crawls the page and distills it to
-            token-optimal markdown — once, for everyone.
+            On a miss, Slipstream clean-crawls, strips chrome, preserves code, and
+            distills to markdown — once, for everyone.
           </p>
         </div>
         <div className="card">
@@ -106,13 +207,40 @@ export default function Home() {
         </div>
       </div>
 
+      <h2>Slipstream vs. the alternatives</h2>
+      <div className="compare">
+        <div className="crow head">
+          <span></span>
+          <span>Raw fetch</span>
+          <span>Per-call cleaners</span>
+          <span className="me">Slipstream</span>
+        </div>
+        {[
+          ["Token-optimized output", "✗", "✓", "✓"],
+          ["Cross-agent shared cache", "✗", "✗", "✓"],
+          ["Gets cheaper as more agents use it", "✗", "✗", "✓"],
+          ["Conditional revalidation (304)", "✗", "~", "✓"],
+          ["One-line MCP install", "✗", "~", "✓"],
+        ].map((r) => (
+          <div className="crow" key={r[0]}>
+            <span className="rl">{r[0]}</span>
+            <span>{r[1]}</span>
+            <span>{r[2]}</span>
+            <span className="me">{r[3]}</span>
+          </div>
+        ))}
+      </div>
+
       <h2>Add it to your agent (30 seconds)</h2>
-      <pre>{mcpSnippet}</pre>
+      <pre>{`{
+  "mcpServers": {
+    "slipstream": { "url": "${MCP_URL}" }
+  }
+}`}</pre>
 
       <footer>
-        <span className="dot" />
-        Slipstream · a shared cache that gets cheaper for everyone the more it’s
-        used.
+        <span className="dot" /> Slipstream · a shared cache that gets cheaper for
+        everyone the more it’s used. · <a href="https://github.com/tathagat22/slipstream">source</a>
       </footer>
     </main>
   );

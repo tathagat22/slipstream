@@ -32,8 +32,13 @@ const handler = createMcpHandler(
           const pct = r.originalTokens
             ? Math.round((r.tokensSaved / r.originalTokens) * 100)
             : 0;
+          const state = r.cacheHit
+            ? r.revalidated
+              ? "cache HIT (revalidated 304)"
+              : "cache HIT"
+            : "cache MISS (now cached for the next agent)";
           const footer =
-            `\n\n---\n_Slipstream ${r.cacheHit ? "cache HIT" : "cache MISS (now cached for the next agent)"}` +
+            `\n\n---\n_Slipstream ${state}` +
             ` · ${r.distilledTokens} tokens returned vs ~${r.originalTokens} raw` +
             ` · saved ~${r.tokensSaved} tokens (${pct}%)_`;
           return { content: [{ type: "text", text: r.markdown + footer }] };
@@ -54,6 +59,10 @@ const handler = createMcpHandler(
       {},
       async () => {
         const s = await getStats();
+        const top = s.topDomains
+          .slice(0, 5)
+          .map((d) => `    ${d.member} (${d.score.toLocaleString()})`)
+          .join("\n");
         return {
           content: [
             {
@@ -61,10 +70,12 @@ const handler = createMcpHandler(
               text:
                 `Slipstream global stats\n` +
                 `- Tokens saved for agents worldwide: ${s.tokensSaved.toLocaleString()}\n` +
+                `- ≈ $${s.usdSaved.toFixed(2)} saved · ≈ ${s.booksOfText.toFixed(1)} books of text\n` +
                 `- Pages in shared cache: ${s.pagesCached.toLocaleString()}\n` +
                 `- Cache hits: ${s.hits.toLocaleString()} / misses: ${s.misses.toLocaleString()}\n` +
                 `- Hit rate: ${(s.hitRate * 100).toFixed(1)}%\n` +
-                `- Shared backend: ${s.shared ? "yes (Redis)" : "no (in-memory dev)"}`,
+                `- Shared backend: ${s.shared ? "yes (Redis)" : "no (in-memory dev)"}\n` +
+                (top ? `- Top domains by tokens saved:\n${top}` : ""),
             },
           ],
         };
