@@ -58,10 +58,17 @@ export function isLikelySpa(
     /<div[^>]+id=["'](root|app|__next)["']|data-reactroot|__NEXT_DATA__|window\.__NUXT__|ng-version|<div[^>]+id=["']svelte/i.test(
       html,
     );
+  // Absolute floor: a genuinely under-rendered SPA extracts almost no text.
+  // Boilerplate-heavy *static* sites (W3Schools, docs portals with huge nav/ad
+  // chrome) can have a tiny distilled/raw ratio yet still carry complete
+  // content, so ratio alone over-fires. Requiring a low absolute token count
+  // keeps the signal on pages that are actually empty.
+  const noRealText = distilledTokens < 150;
   // Lots of HTML but almost no extractable text => extraction failed (the
   // classic SPA lie), regardless of which framework's shell it is.
-  const veryThin = ratio < 0.02 && originalTokens > 3000;
-  // A clear app shell needs less evidence of thinness.
-  const thinWithShell = (distilledTokens < 200 || ratio < 0.05) && shell;
+  const veryThin = ratio < 0.02 && originalTokens > 3000 && noRealText;
+  // A clear app shell needs less evidence of thinness — but still must be thin
+  // in absolute terms, not merely a small fraction of a large page.
+  const thinWithShell = shell && noRealText;
   return veryThin || thinWithShell;
 }
