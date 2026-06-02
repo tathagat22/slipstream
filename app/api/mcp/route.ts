@@ -355,4 +355,36 @@ const handler = createMcpHandler(
   { basePath: "/api" },
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+// CORS so browser-based MCP clients / web agents can reach the endpoint
+// cross-origin. The server is public and stateless per request, so a wildcard
+// origin is appropriate; we expose the MCP session header browsers need to read.
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, Mcp-Session-Id, mcp-session-id, mcp-protocol-version, Last-Event-ID",
+  "Access-Control-Expose-Headers": "Mcp-Session-Id, mcp-session-id",
+  "Access-Control-Max-Age": "86400",
+};
+
+function withCors(
+  fn: (req: Request) => Promise<Response>,
+): (req: Request) => Promise<Response> {
+  return async (req: Request) => {
+    const res = await fn(req);
+    for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v);
+    return res;
+  };
+}
+
+export function OPTIONS(): Response {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+const corsHandler = withCors(handler);
+
+export {
+  corsHandler as GET,
+  corsHandler as POST,
+  corsHandler as DELETE,
+};
