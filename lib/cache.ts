@@ -165,6 +165,10 @@ export function urlHash(url: string): string {
   try {
     const u = new URL(url);
     u.hash = "";
+    // /docs and /docs/ are the same page — don't fragment the shared cache
+    if (u.pathname.length > 1 && u.pathname.endsWith("/")) {
+      u.pathname = u.pathname.slice(0, -1);
+    }
     normalized = u.toString();
   } catch {
     /* keep raw string if not a valid URL */
