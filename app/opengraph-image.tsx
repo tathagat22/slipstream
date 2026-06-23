@@ -77,7 +77,7 @@ export default function OG() {
               background: "#00000040",
             }}
           >
-            Shared MCP cache
+            Living web changelog
           </div>
         </div>
       </div>

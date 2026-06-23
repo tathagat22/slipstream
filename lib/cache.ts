@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import { normalizeForDedup } from "./security";
+import type { SectionIndex } from "./secdiff";
 
 // ── Storage backend ─────────────────────────────────────────────────────────
 // Production: Upstash Redis (shared across every serverless invocation = a real
@@ -18,6 +19,9 @@ type Store = {
   zincr(key: string, member: string, amount: number): Promise<void>;
   ztop(key: string, count: number): Promise<ZMember[]>;
   incrTtl(key: string, ttlSec: number): Promise<number>;
+  setJSONNX(key: string, value: unknown, ttlSec: number): Promise<boolean>;
+  setJSONTtl(key: string, value: unknown, ttlSec: number): Promise<void>;
+  del(key: string): Promise<void>;
 };
 
 function makeRedisStore(redis: Redis): Store {
@@ -60,6 +64,16 @@ function makeRedisStore(redis: Redis): Store {
       const n = await redis.incr(key);
       if (n === 1) await redis.expire(key, ttlSec);
       return n;
+    },
+    async setJSONNX(key, value, ttlSec) {
+      const res = await redis.set(key, value, { nx: true, ex: ttlSec });
+      return res === "OK";
+    },
+    async setJSONTtl(key, value, ttlSec) {
+      await redis.set(key, value, { ex: ttlSec });
+    },
+    async del(key) {
+      await redis.del(key);
     },
   };
 }
@@ -114,6 +128,19 @@ function makeMemoryStore(): Store {
       rec.count += 1;
       return rec.count;
     },
+    // Dev TTL is best-effort (single-process Map); NX semantics are exact so
+    // first-writer-wins behaviour (body ownership) is faithfully testable.
+    async setJSONNX(key, value) {
+      if (kv.has(key)) return false;
+      kv.set(key, value);
+      return true;
+    },
+    async setJSONTtl(key, value) {
+      kv.set(key, value);
+    },
+    async del(key) {
+      kv.delete(key);
+    },
   };
 }
 
@@ -154,11 +181,26 @@ const K_NOTES_COUNT = "slip:stat:notes";
 const K_NOTE_VOTES = (id: string) => `slip:nv:${id}`;
 const K_NOTE_FLAGS = (id: string) => `slip:nf:${id}`;
 const K_RL = (action: string, client: string) => `slip:rl:${action}:${client}`;
+// Feature 2 — content-address dedup / mirror collapsing.
+const K_BODY = (bodyHash: string) => `slip:body:${bodyHash}`;
+const K_ALIAS = (hash: string) => `slip:alias:${hash}`;
+const K_ALIAS_HITS = "slip:stat:alias_hits";
+// Feature 3 — prior section indexes for heading-level temporal diffs.
+const K_SECIDX = (uHash: string, cHash: string) => `slip:secidx:${uHash}:${cHash}`;
+// Feature 6 — hive "don't-bother" low-yield verdicts.
+const K_DONTBOTHER = (hash: string) => `slip:db:${hash}`;
 
 // A note is hidden once enough agents distrust it.
 const HIDE_NET = -3;
 const HIDE_FLAGS = 5;
 const DECAY_HALF_LIFE_DAYS = 30;
+
+// TTLs (seconds) for the new shared indexes.
+const ALIAS_TTL_SEC = 24 * 60 * 60; // matches page freshness window
+const BODY_TTL_SEC = 25 * 60 * 60; // slightly > page TTL so owner is re-validatable
+const PRIOR_IDX_TTL_SEC = 30 * 24 * 60 * 60; // prior bodies expire after 30 days
+const DONTBOTHER_TTL_SEC = 6 * 60 * 60; // low-yield verdicts decay so fixed sites recover
+const RETAIN_PRIOR = 3; // keep only the last N prior section indexes per URL
 
 export function urlHash(url: string): string {
   let normalized = url.trim();
@@ -192,7 +234,10 @@ export type CachedPage = {
   createdAt: number;
   etag?: string;
   lastModified?: string;
-  contentHash?: string;
+  contentHash?: string; // 16-hex display/known_hash fingerprint
+  bodyHash?: string; // full 64-hex sha256 of markdown — dedup key (Feature 2)
+  index?: SectionIndex; // precomputed section index + per-section hashes (Feature 1)
+  ttlMs?: number; // adaptive freshness window from observed volatility (Feature 4)
   renderedWith?: string; // e.g. "firecrawl" when JS-rendered
   spaPartial?: boolean; // SPA detected but no renderer available
 };
@@ -224,6 +269,7 @@ export async function recordSave(
   savedTokens: number,
   hit: boolean,
   url: string,
+  alias = false,
 ): Promise<void> {
   const s = store();
   const domain = domainOf(url);
@@ -233,7 +279,84 @@ export async function recordSave(
     s.incrBy(hit ? K_HITS : K_MISSES, 1),
     s.zincr(K_DOMAINS, domain, saved),
     s.pushCapped(K_ACTIVITY, { domain, saved, hit, at: Date.now() } as Activity, 30),
+    ...(alias ? [s.incrBy(K_ALIAS_HITS, 1)] : []),
   ]);
+}
+
+// ── Feature 2: content-address dedup / mirror collapsing ──────────────────────
+// A body is owned by the first urlHash that crawled it (NX, append-only). Other
+// URLs that distill to the SAME body alias to that owner instead of re-crawling.
+// The served body is always one the cache already trusted, so a (cryptographically
+// infeasible) full-sha256 collision can at worst serve content the agent would
+// have fetched anyway.
+
+export type Alias = {
+  owner: string; // canonical urlHash that owns the body
+  bodyHash: string; // full 64-hex sha256 the alias was minted against
+  at: number;
+  kind: "same-content" | "mirror";
+};
+
+export async function getAlias(hash: string): Promise<Alias | null> {
+  return store().getJSON<Alias>(K_ALIAS(hash));
+}
+
+export async function putAlias(
+  hash: string,
+  owner: string,
+  bodyHash: string,
+  kind: Alias["kind"] = "same-content",
+): Promise<void> {
+  if (hash === owner) return; // never self-alias
+  await store().setJSONTtl(
+    K_ALIAS(hash),
+    { owner, bodyHash, at: Date.now(), kind } as Alias,
+    ALIAS_TTL_SEC,
+  );
+}
+
+export async function getBodyOwner(bodyHash: string): Promise<string | null> {
+  return store().getJSON<string>(K_BODY(bodyHash));
+}
+
+/** Claim ownership of a body hash — first writer wins (NX). Returns true if claimed. */
+export async function claimBodyOwner(bodyHash: string, owner: string): Promise<boolean> {
+  return store().setJSONNX(K_BODY(bodyHash), owner, BODY_TTL_SEC);
+}
+
+// ── Feature 3: prior section indexes (heading-level temporal diffs) ────────────
+export async function putPriorSectionIndex(
+  uHash: string,
+  cHash: string,
+  index: SectionIndex,
+): Promise<void> {
+  await store().setJSONTtl(K_SECIDX(uHash, cHash), index, PRIOR_IDX_TTL_SEC);
+}
+
+export async function getPriorSectionIndex(
+  uHash: string,
+  cHash: string,
+): Promise<SectionIndex | null> {
+  return store().getJSON<SectionIndex>(K_SECIDX(uHash, cHash));
+}
+
+export async function delPriorSectionIndex(uHash: string, cHash: string): Promise<void> {
+  await store().del(K_SECIDX(uHash, cHash));
+}
+
+// ── Feature 6: hive "don't-bother" low-yield verdicts ─────────────────────────
+export type LowYield = { reason: string; at: number };
+
+export async function getLowYield(hash: string): Promise<LowYield | null> {
+  return store().getJSON<LowYield>(K_DONTBOTHER(hash));
+}
+
+export async function putLowYield(hash: string, reason: string): Promise<void> {
+  await store().setJSONTtl(
+    K_DONTBOTHER(hash),
+    { reason, at: Date.now() } as LowYield,
+    DONTBOTHER_TTL_SEC,
+  );
 }
 
 // ── Content version history (substrate for cutoff-aware "what changed") ───────
@@ -261,6 +384,8 @@ export type Note = {
   text: string;
   votes: number;
   at: number;
+  pinHash?: string; // page contentHash when written (Feature 5: self-retiring notes)
+  stale?: boolean; // presentation-only: set at read time when the page has changed
 };
 
 // Normalize a target to a stable key. URLs collapse to their content-address so
@@ -282,6 +407,7 @@ export async function addNote(
   target: string,
   text: string,
   kind: NoteKind,
+  pinHash?: string,
 ): Promise<AddNoteResult> {
   const s = store();
   const key = K_NOTES(noteKey(target));
@@ -303,6 +429,7 @@ export async function addNote(
     text: text.slice(0, 500),
     votes: 1,
     at: Date.now(),
+    ...(pinHash ? { pinHash } : {}),
   };
   await Promise.all([
     s.pushCapped(key, note, 50),
@@ -341,6 +468,16 @@ async function rankNotes(notes: Note[]): Promise<Note[]> {
 export async function getNotes(target: string, limit = 8): Promise<Note[]> {
   const raw = await store().listRange<Note>(K_NOTES(noteKey(target)), 50);
   return (await rankNotes(raw)).slice(0, limit);
+}
+
+// Soft-label (never hide) notes written against an older version of the page.
+// A pinned note whose contentHash no longer matches the live page is flagged
+// "may be stale — page changed since written" so agents weight it accordingly.
+export function markStaleNotes(notes: Note[], currentContentHash?: string): Note[] {
+  if (!currentContentHash) return notes;
+  return notes.map((n) =>
+    n.pinHash && n.pinHash !== currentContentHash ? { ...n, stale: true } : n,
+  );
 }
 
 export async function voteNote(id: string): Promise<number> {
@@ -395,11 +532,12 @@ export type Stats = {
   activity: Activity[];
   notesCount: number;
   recentNotes: Note[];
+  aliasHits: number;
 };
 
 export async function getStats(): Promise<Stats> {
   const s = store();
-  const [tokensSaved, hits, misses, pagesCached, topDomains, activity, notesCount] =
+  const [tokensSaved, hits, misses, pagesCached, topDomains, activity, notesCount, aliasHits] =
     await Promise.all([
       s.get(K_TOKENS_SAVED),
       s.get(K_HITS),
@@ -408,6 +546,7 @@ export async function getStats(): Promise<Stats> {
       s.ztop(K_DOMAINS, 8),
       s.listRange<Activity>(K_ACTIVITY, 12),
       s.get(K_NOTES_COUNT),
+      s.get(K_ALIAS_HITS),
     ]);
   const recentNotes = await getRecentNotes(8);
   const total = hits + misses;
@@ -424,5 +563,6 @@ export async function getStats(): Promise<Stats> {
     activity,
     notesCount,
     recentNotes,
+    aliasHits,
   };
 }

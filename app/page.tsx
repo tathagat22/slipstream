@@ -147,7 +147,10 @@ export default function Home() {
         thousands of tokens to extract a few hundred. Slipstream distills a URL{" "}
         <strong>once</strong>, then serves it — content-addressed and{" "}
         <strong>shared across every agent on Earth</strong> — for{" "}
-        <strong>~73–89% fewer tokens.</strong>
+        <strong>~73–89% fewer tokens.</strong> And when a page changes, the
+        first agent to re-crawl computes the per-section delta once, so every
+        later agent inherits a <strong>heading-level changelog of the live
+        web</strong> — what changed since the version it cited, for ~0 tokens.
       </p>
 
       <section className="counter">
@@ -297,8 +300,8 @@ export default function Home() {
         {[
           ["Token-optimized output", "✗", "✓", "✓"],
           ["Cross-agent shared cache", "✗", "✗", "✓"],
-          ["Gets cheaper as more agents use it", "✗", "✗", "✓"],
-          ["Conditional revalidation (304)", "✗", "~", "✓"],
+          ["Heading-level diffs across agents", "✗", "✗", "✓"],
+          ["Dedup + mirror collapsing lifts hit rate", "✗", "✗", "✓"],
           ["One-line MCP install", "✗", "~", "✓"],
         ].map((r) => (
           <div className="crow" key={r[0]}>
@@ -316,8 +319,8 @@ export default function Home() {
           {
             group: "Efficiency",
             items: [
-              ["cached_fetch", "Clean, token-optimized markdown from the shared cache. Delta (known_hash), sections, and cutoff-aware corrections built in."],
-              ["cached_outline", "Token-cheap table of contents with the cost of each section — fetch only what you need."],
+              ["cached_fetch", "Clean, token-optimized markdown from the shared cache. Pass known_hash and it returns only the sections that changed — a heading-level changelog, not a re-crawl."],
+              ["cached_outline", "Token-cheap table of contents with per-section hashes and cost — fetch only what you need, diff only what moved."],
             ],
           },
           {
