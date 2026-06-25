@@ -82,10 +82,13 @@ export const fragmentShader = /* glsl */ `
     float t = uTime * 0.05 + uSeed * 10.0;
     sp.x -= uTime * 0.05;
 
-    // The distillation membrane sits left-of-centre and sweeps gently; scroll
-    // nudges it further left (the current "wins" as you descend).
-    float line = 0.34 + 0.04 * sin(uTime * 0.12) - uProgress * 0.14;
-    float side = smoothstep(line - 0.18, line + 0.20, uv.x); // 0 raw -> 1 distilled
+    // The distillation membrane breathes along Y and, as you scroll, travels
+    // fully off-screen left — so the whole page comes to live *inside* the
+    // distilled current rather than behind a faded-out tombstone of it.
+    float line = 0.34 + 0.04 * sin(uTime * 0.12)
+               + 0.018 * sin(uTime * 0.3 + uv.y * 2.1)
+               - uProgress * 0.55;
+    float side = smoothstep(line - 0.05, line + 0.07, uv.x); // tight knife-edge
 
     // Domain warp — violent/inky on the raw side, near-laminar once distilled.
     float chaos = mix(1.0, 0.10, side);
@@ -117,9 +120,9 @@ export const fragmentShader = /* glsl */ `
     vec3 dist = mix(indigo * 0.45, cyan, smoothstep(0.2, 1.0, bands)) * (0.45 + 0.7 * bands);
     vec3 col  = mix(raw, dist, side);
 
-    // Membrane glow — the moment of distillation.
-    float lineGlow = smoothstep(0.035, 0.0, abs(uv.x - line));
-    col += cyan * lineGlow * (0.55 + 0.4 * sin(uTime * 1.4 + uv.y * 5.0));
+    // Membrane glow — a luminous knife-edge, the moment of distillation.
+    float lineGlow = smoothstep(0.018, 0.0, abs(uv.x - line));
+    col += cyan * lineGlow * 1.25 * (0.7 + 0.3 * sin(uTime * 1.4 + uv.y * 5.0));
 
     // Live save pulse: a bright wavefront sweeping the distilled side.
     float wave = smoothstep(0.05, 0.0,
@@ -129,10 +132,11 @@ export const fragmentShader = /* glsl */ `
     // Heat sparkle near cursor
     col += cyan * heat * 0.2;
 
-    // Vignette + scroll fade so lower scenes read as a calm dark backdrop.
+    // Vignette + a gentle calming (NOT a kill): the current persists across the
+    // whole scroll as the distilled world, just quieter so panels stay legible.
     float vig = smoothstep(1.3, 0.3, distance(uv, vec2(0.5)));
     col *= 0.6 + 0.4 * vig;
-    col *= mix(1.0, 0.22, smoothstep(0.0, 0.5, uProgress));
+    col *= mix(1.0, 0.55, smoothstep(0.0, 0.45, uProgress));
 
     gl_FragColor = vec4(col, 1.0);
   }

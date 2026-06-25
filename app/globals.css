@@ -1,8 +1,9 @@
 :root {
   --bg: #07080d;
-  --panel: #0e1018;
-  --panel2: #11141e;
-  --line: #1c2030;
+  /* Translucent so the surviving distillation current flows behind the panels. */
+  --panel: rgba(14, 16, 24, 0.52);
+  --panel2: rgba(17, 20, 30, 0.52);
+  --line: rgba(120, 135, 170, 0.16);
   --text: #e8ecf6;
   --muted: #8a93a8;
   --accent: #5eead4;
@@ -102,7 +103,7 @@ body {
   width: 34px;
   height: 34px;
   margin: -17px 0 0 -17px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(94, 234, 212, 0.6);
 }
 body.has-cursor {
   cursor: none;
@@ -191,11 +192,14 @@ h1 {
   letter-spacing: -0.03em;
   font-weight: 600;
   margin-bottom: 22px;
-  background: linear-gradient(180deg, #fff, #9aa3bd);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  /* Solid fill (not gradient-clip) so SplitText line-divs inherit a visible
+     color. Fraunces at this scale carries the premium on its own. */
+  color: #eef1fb;
   transition: filter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* SplitText wraps lines in masked clips; make sure they show the headline fill. */
+h1 .split-line {
+  color: inherit;
 }
 /* The hero loop pulses this on each distill (see slip-distill in page.tsx). */
 h1.distill {
@@ -483,7 +487,61 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 24px;
-  background: linear-gradient(180deg, #11141e, #0c0e16);
+  background: linear-gradient(180deg, rgba(17, 20, 30, 0.55), rgba(12, 14, 22, 0.55));
+}
+
+/* Frosted glass: the current shows through every panel → one cohesive world. */
+.counter,
+.feed,
+.board,
+.hive,
+.card,
+.toolgroup,
+.compare,
+.codewrap pre,
+.faqitem,
+.cta.ghost {
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+
+/* Above-fold CTAs */
+.herocta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 0 52px;
+}
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 14px 24px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  will-change: transform;
+}
+.cta:not(.ghost) {
+  background: var(--accent);
+  color: #06121038;
+  color: #061210;
+  box-shadow: 0 8px 30px -8px rgba(94, 234, 212, 0.5);
+}
+.cta:not(.ghost):hover {
+  text-decoration: none;
+  filter: brightness(1.06);
+}
+.cta.ghost {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--line);
+  color: var(--text);
+}
+.cta.ghost:hover {
+  text-decoration: none;
+  border-color: var(--accent2);
 }
 .hivesub {
   color: var(--muted);
@@ -505,6 +563,92 @@ h2 {
 .tag.tip {
   color: var(--good);
   background: #5eead418;
+}
+
+/* ---- Living Web Changelog diff ---- */
+.changelog {
+  margin: 56px 0;
+}
+.changelog .hivesub {
+  margin: 6px 0 22px;
+}
+.diff {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--panel);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+.diffhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.diffdom {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+}
+.diffbadge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: #5eead412;
+  border: 1px solid #5eead430;
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+.diffbody {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 8px 0;
+}
+.dl {
+  display: flex;
+  gap: 12px;
+  padding: 4px 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dl .gutter {
+  width: 12px;
+  flex: none;
+  text-align: center;
+  color: var(--muted);
+  user-select: none;
+}
+.dl.ctx .dt {
+  color: var(--text);
+  font-weight: 600;
+}
+.dl.add {
+  background: linear-gradient(90deg, #5eead416, transparent);
+}
+.dl.add .gutter,
+.dl.add .dt {
+  color: var(--accent);
+}
+.dl.del {
+  background: linear-gradient(90deg, #fb718512, transparent);
+}
+.dl.del .gutter,
+.dl.del .dt {
+  color: #fca5a5;
+  text-decoration: line-through;
+  text-decoration-color: #fb718560;
+}
+.dl.fold .dt {
+  color: var(--muted);
+  font-style: italic;
+  opacity: 0.75;
 }
 
 .how {
@@ -847,15 +991,18 @@ footer {
 /* ---- Motion: scroll reveals + live-feed entrances ---- */
 .reveal {
   opacity: 0;
-  transform: translateY(24px);
+  transform: translateY(30px);
+  filter: blur(7px);
   transition:
-    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
+    opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform, filter;
 }
 .reveal.in {
   opacity: 1;
   transform: none;
+  filter: none;
 }
 
 /* Staggered grids — children rise in sequence once the container intersects. */

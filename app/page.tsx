@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { FAQ } from "@/lib/faq";
 import { INSTALL } from "@/lib/install";
 import { flow } from "@/lib/store";
+import ChangelogDemo from "@/components/ChangelogDemo";
 
 const Scene = dynamic(() => import("@/components/Scene"), { ssr: false });
 const Craft = dynamic(() => import("@/components/Craft"), { ssr: false });
@@ -200,7 +201,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <span className="eyebrow">The shared cache for AI agents</span>
+      <span className="eyebrow">Distill once · draft forever</span>
       <h1 ref={h1Ref}>
         Every agent makes the
         <br />
@@ -222,6 +223,15 @@ export default function Home() {
         later agent inherits a <strong>heading-level changelog of the live
         web</strong> — what changed since the version it cited, for ~0 tokens.
       </p>
+
+      <div className="herocta">
+        <a className="cta magnetic" href="/install">
+          Install free — 30 seconds
+        </a>
+        <a className="cta ghost magnetic" href="/docs">
+          Read the docs ↗
+        </a>
+      </div>
 
       <section className="counter reveal">
         <div className="label">
@@ -256,11 +266,6 @@ export default function Home() {
             <div className="k">cold crawls</div>
           </div>
         </div>
-        {!stats?.shared && (
-          <div className="warn">
-            in-memory dev store — add Upstash Redis to persist + share globally
-          </div>
-        )}
       </section>
 
       <div className="twocol reveal">
@@ -304,6 +309,8 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      <ChangelogDemo />
 
       <section className="hive reveal">
         <h2>
