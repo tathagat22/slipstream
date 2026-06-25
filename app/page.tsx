@@ -341,7 +341,7 @@ export default function Home() {
         </div>
       </section>
 
-      <h2 className="reveal">How it works</h2>
+      <h2 className="kinetic">How it works</h2>
       <div className="how reveal-stagger">
         <div className="card">
           <div className="step">1 · Call</div>
@@ -366,12 +366,12 @@ export default function Home() {
         </div>
       </div>
 
-      <h2 className="reveal">Slipstream vs. the alternatives</h2>
+      <h2 className="kinetic">Slipstream vs. the alternatives</h2>
       <div className="compare reveal-stagger">
         <div className="crow head">
           <span></span>
           <span>Raw fetch</span>
-          <span>Per-call cleaners</span>
+          <span>Your agent, alone</span>
           <span className="me">Slipstream</span>
         </div>
         {[
@@ -390,7 +390,7 @@ export default function Home() {
         ))}
       </div>
 
-      <h2 className="reveal">The toolkit · 8 MCP tools</h2>
+      <h2 className="kinetic">The toolkit · 8 MCP tools</h2>
       <div className="tools reveal-stagger">
         {[
           {
@@ -434,7 +434,7 @@ export default function Home() {
         ))}
       </div>
 
-      <h2 className="reveal">Install in 30 seconds</h2>
+      <h2 className="kinetic">Install in 30 seconds</h2>
       <div className="install reveal">
         <div className="tabs">
           {Object.entries(INSTALL).map(([key, v]) => (
@@ -462,7 +462,7 @@ export default function Home() {
         </p>
       </div>
 
-      <h2 className="reveal">Frequently asked questions</h2>
+      <h2 className="kinetic">Frequently asked questions</h2>
       <div className="faq reveal">
         {FAQ.map((f) => (
           <details className="faqitem" key={f.q}>

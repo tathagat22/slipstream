@@ -22,6 +22,7 @@ html,
 body {
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
   font-family:
     var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
@@ -68,12 +69,28 @@ body {
 /* Film grain — makes the dark feel tactile, not flat. */
 .grain {
   position: fixed;
-  inset: 0;
+  inset: -40%;
   z-index: 60;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: 0.055;
   mix-blend-mode: overlay;
+  background-repeat: repeat;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  animation: grain 0.45s steps(3) infinite;
+}
+@keyframes grain {
+  0% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(-6%, 4%);
+  }
+  66% {
+    transform: translate(5%, -5%);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .grain {
@@ -187,11 +204,20 @@ code {
 
 h1 {
   font-family: var(--font-display), ui-serif, Georgia, serif;
-  font-size: clamp(44px, 8vw, 92px);
-  line-height: 0.94;
+  font-size: clamp(26px, 7vw, 92px);
+  line-height: 0.98;
   letter-spacing: -0.03em;
   font-weight: 600;
   margin-bottom: 22px;
+  overflow-wrap: break-word;
+}
+/* Let the headline wrap naturally on phones; the forced break is desktop-only. */
+@media (max-width: 640px) {
+  h1 br {
+    display: none;
+  }
+}
+h1 {
   /* Solid fill (not gradient-clip) so SplitText line-divs inherit a visible
      color. Fraunces at this scale carries the premium on its own. */
   color: #eef1fb;

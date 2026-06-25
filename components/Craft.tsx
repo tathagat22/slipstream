@@ -36,6 +36,27 @@ export default function Craft() {
           split.revert();
         });
       }
+
+      // Section headings: the same line-mask, fired as each scrolls into view.
+      gsap.utils.toArray<HTMLElement>(".kinetic").forEach((h) => {
+        const sp = SplitText.create(h, {
+          type: "lines",
+          mask: "lines",
+          autoSplit: true,
+        });
+        const tw = gsap.from(sp.lines, {
+          yPercent: 115,
+          opacity: 0,
+          duration: 0.9,
+          ease: "expo.out",
+          stagger: 0.08,
+          scrollTrigger: { trigger: h, start: "top 85%", once: true },
+        });
+        cleanups.push(() => {
+          tw.kill();
+          sp.revert();
+        });
+      });
     }
 
     // --- Custom cursor ---
