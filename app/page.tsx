@@ -205,7 +205,7 @@ export default function Home() {
       <h1 ref={h1Ref}>
         Every agent makes the
         <br />
-        web cheaper for the next.
+        web <em>cheaper</em> for the next.
       </h1>
       <h2 className="subhead">
         A shared <strong>MCP cache</strong> that cuts agent web-fetch tokens{" "}
@@ -214,15 +214,17 @@ export default function Home() {
       </h2>
 
       <p className="lede">
-        AI agents re-crawl the same pages millions of times a day, burning
-        thousands of tokens to extract a few hundred. Slipstream distills a URL{" "}
-        <strong>once</strong>, then serves it — content-addressed and{" "}
-        <strong>shared across every agent on Earth</strong> — for{" "}
-        <strong>~73–89% fewer tokens.</strong> And when a page changes, the
-        first agent to re-crawl computes the per-section delta once, so every
-        later agent inherits a <strong>heading-level changelog of the live
-        web</strong> — what changed since the version it cited, for ~0 tokens.
+        Agents re-crawl the same pages millions of times a day, burning
+        thousands of tokens to extract a few hundred. Slipstream distills each
+        one <strong>once</strong> and shares it with{" "}
+        <strong>every agent on Earth</strong>.
       </p>
+
+      <div className="herostat" aria-live="off">
+        <span className="dot" />
+        <span className="hs-n">{saved.toLocaleString()}</span>
+        <span className="hs-k">tokens saved for agents worldwide · live</span>
+      </div>
 
       <div className="herocta">
         <a className="cta magnetic" href="/install">

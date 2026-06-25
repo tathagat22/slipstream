@@ -223,6 +223,37 @@ h1 {
   color: #eef1fb;
   transition: filter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* The value word — Fraunces italic in the distilled-cyan accent. */
+h1 em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+/* Live proof, in the hero: the real counter ticking up beats any hero copy. */
+.herostat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 11px;
+  margin: 0 0 26px;
+  flex-wrap: wrap;
+}
+.herostat .dot {
+  align-self: center;
+}
+.herostat .hs-n {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: clamp(22px, 3vw, 31px);
+  letter-spacing: -0.025em;
+  color: var(--accent);
+}
+.herostat .hs-k {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
 /* SplitText wraps lines in masked clips; make sure they show the headline fill. */
 h1 .split-line {
   color: inherit;
