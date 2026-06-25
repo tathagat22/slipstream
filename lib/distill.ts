@@ -411,9 +411,18 @@ export async function distill(
   const fetched = await crawl(fetchUrl, cached ?? undefined);
 
   if (fetched.status === 304 && cached) {
+    // Confirmed unchanged → the page earned a longer leash. Grow its freshness
+    // window geometrically (capped) so provably-stable content (papers, wiki,
+    // reference docs) is re-validated less and less often — fewer origin
+    // round-trips and conditional fetches over time, on ANY origin (no feed
+    // needed). A real change later returns 200, re-distills, and adaptiveTtlMs
+    // resets the window from the fresh change history — so the leash is earned,
+    // not guessed, and tightens the moment volatility reappears.
+    const grownTtl = Math.min(TTL_MAX_MS, Math.round((cached.ttlMs ?? TTL_MS) * 1.6));
     const refreshed: CachedPage = {
       ...upgrade(cached),
       createdAt: Date.now(),
+      ttlMs: grownTtl,
     };
     await putCachedPage(canonHash, refreshed, false);
     const r = await finalize(refreshed, opts, true, true, canonHash);

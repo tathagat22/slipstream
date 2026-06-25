@@ -189,6 +189,13 @@ const K_ALIAS_HITS = "slip:stat:alias_hits";
 const K_SECIDX = (uHash: string, cHash: string) => `slip:secidx:${uHash}:${cHash}`;
 // Feature 6 — hive "don't-bother" low-yield verdicts.
 const K_DONTBOTHER = (hash: string) => `slip:db:${hash}`;
+// Tier 1 — demand telemetry (admission control for predictive pre-distillation).
+// K_DEMAND_RECENT is the access log WITH urls + timestamps (the 30-item activity
+// ring drops the url, so it can't drive a lead-time backtest). K_DEMAND_FREQ is
+// the "hot head": how often each doc-set is queried, the gate on speculation.
+const K_DEMAND_RECENT = "slip:demand:recent";
+const K_DEMAND_FREQ = "slip:demand:freq";
+const DEMAND_RECENT_MAX = 2000;
 
 // A note is hidden once enough agents distrust it.
 const HIDE_NET = -3;
@@ -223,6 +230,19 @@ export function domainOf(url: string): string {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
     return "unknown";
+  }
+}
+
+// A "doc-set" is the releasable unit we gate predictive prewarm on: domain +
+// first path segment, so react.dev/learn and react.dev/reference rank as
+// distinct hot sets (closer to how docs map to a package/repo than bare domain).
+export function docSetOf(url: string): string {
+  try {
+    const u = new URL(url);
+    const seg = u.pathname.split("/").filter(Boolean)[0];
+    return seg ? `${domainOf(url)}/${seg}` : domainOf(url);
+  } catch {
+    return domainOf(url);
   }
 }
 
@@ -279,8 +299,28 @@ export async function recordSave(
     s.incrBy(hit ? K_HITS : K_MISSES, 1),
     s.zincr(K_DOMAINS, domain, saved),
     s.pushCapped(K_ACTIVITY, { domain, saved, hit, at: Date.now() } as Activity, 30),
+    // Tier 1 demand telemetry — once per fetch, retains the url + timestamp.
+    s.zincr(K_DEMAND_FREQ, docSetOf(url), 1),
+    s.pushCapped(
+      K_DEMAND_RECENT,
+      { url, domain, at: Date.now() } as DemandEvent,
+      DEMAND_RECENT_MAX,
+    ),
     ...(alias ? [s.incrBy(K_ALIAS_HITS, 1)] : []),
   ]);
+}
+
+// ── Tier 1: demand telemetry readers (for the prewarm backtest + admission gate)
+export type DemandEvent = { url: string; domain: string; at: number };
+
+/** Recent fetch events with url + timestamp, newest first (the real access log). */
+export async function getRecentDemand(limit = DEMAND_RECENT_MAX): Promise<DemandEvent[]> {
+  return store().listRange<DemandEvent>(K_DEMAND_RECENT, limit);
+}
+
+/** Hot doc-sets ranked by query frequency — the gate on speculative prewarm. */
+export async function getDemandIndex(topN = 100): Promise<ZMember[]> {
+  return store().ztop(K_DEMAND_FREQ, topN);
 }
 
 // ── Feature 2: content-address dedup / mirror collapsing ──────────────────────
