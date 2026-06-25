@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
 import TurndownService from "turndown";
+import { gfm } from "turndown-plugin-gfm";
 import { estimateTokens } from "./tokens";
 import { assertHtmlLike, readCapped, safeFetch } from "./security";
 import { isLikelySpa, renderJs, rendererAvailable } from "./render";
@@ -41,17 +42,87 @@ const turndown = new TurndownService({
   headingStyle: "atx",
   codeBlockStyle: "fenced",
   bulletListMarker: "-",
+  hr: "---",
+  emDelimiter: "_",
+  linkStyle: "inlined",
 });
-turndown.remove(["script", "style", "noscript", "iframe", "form"]);
+// GFM: tables, strikethrough, task lists. Tables are the single highest-value
+// fix — API param/option tables are core agent content and default Turndown
+// flattens them into unreadable runs of text.
+turndown.use(gfm);
+turndown.remove([
+  "script",
+  "style",
+  "noscript",
+  "iframe",
+  "form",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "template",
+]);
 turndown.remove((node) => node.nodeName.toUpperCase() === "SVG");
 
+// Read a code language from the usual class conventions so agents get ```lang.
+function codeLang(node: HTMLElement): string {
+  const cls =
+    node.getAttribute("class") ||
+    node.querySelector("code")?.getAttribute("class") ||
+    "";
+  const m = /(?:language|lang|highlight|brush:)[-\s:]*([a-z0-9+#]+)/i.exec(cls);
+  const lang = m?.[1]?.toLowerCase() ?? "";
+  return lang === "highlight" || lang === "hljs" ? "" : lang;
+}
+
 // Keep <pre>/<code> verbatim — code is the highest-value, most token-fragile
-// content an agent fetches, and Readability can mangle it.
+// content an agent fetches, and Readability can mangle it. Now language-tagged.
 turndown.addRule("fencedPre", {
   filter: (node) => node.nodeName === "PRE",
   replacement: (_content, node) => {
-    const text = (node as HTMLElement).textContent ?? "";
-    return `\n\n\`\`\`\n${text.replace(/\n+$/, "")}\n\`\`\`\n\n`;
+    const el = node as HTMLElement;
+    const text = (el.textContent ?? "").replace(/\n+$/, "");
+    return `\n\n\`\`\`${codeLang(el)}\n${text}\n\`\`\`\n\n`;
+  },
+});
+
+// Lean links: keep the anchor text, drop noise hrefs (in-page anchors,
+// javascript:/mailto:/tel:, empty, and href===text), and strip tracking params
+// from the rest. Cuts pure token waste without losing real destinations.
+turndown.addRule("leanLinks", {
+  filter: (node) => node.nodeName === "A",
+  replacement: (content, node) => {
+    const text = content.trim();
+    if (!text) return "";
+    const href = (node as HTMLElement).getAttribute("href") || "";
+    if (!href || href.startsWith("#") || /^(javascript|mailto|tel):/i.test(href))
+      return text;
+    let out = href;
+    if (/^https?:\/\//i.test(href)) {
+      try {
+        const u = new URL(href);
+        for (const p of [...u.searchParams.keys()])
+          if (/^utm_/i.test(p) || /^(fbclid|gclid|mc_eid|mc_cid|igshid|ref)$/i.test(p))
+            u.searchParams.delete(p);
+        out = u.toString();
+      } catch {
+        /* keep original href */
+      }
+    }
+    return out === text ? text : `[${text}](${out})`;
+  },
+});
+
+// Lean images: drop base64/data-URI bloat and decorative alt-less images
+// (pure token waste to an agent); keep real, captioned images.
+turndown.addRule("leanImages", {
+  filter: "img",
+  replacement: (_content, node) => {
+    const el = node as HTMLElement;
+    const src = el.getAttribute("src") || "";
+    const alt = (el.getAttribute("alt") || "").trim();
+    if (!src || src.startsWith("data:")) return "";
+    return alt ? `![${alt}](${src})` : "";
   },
 });
 
@@ -70,9 +141,15 @@ const LOW_YIELD_TOKENS = 50;
 
 const NOISE_SELECTORS =
   "nav, header, footer, aside, [role=navigation], [role=banner], " +
-  "[role=contentinfo], .sidebar, .nav, .navbar, .menu, .breadcrumb, " +
-  ".cookie, .cookies, .advertisement, .ad, .ads, .promo, .newsletter, " +
-  ".social, .share, .related, .comments, [aria-hidden=true]";
+  "[role=contentinfo], [role=complementary], [role=search], [role=dialog], " +
+  "[role=alertdialog], .sidebar, .nav, .navbar, .menu, .breadcrumb, " +
+  ".breadcrumbs, .pagination, .pager, .toc, .table-of-contents, " +
+  ".skip-link, .skip-to-content, .cookie, .cookies, [class*=cookie], " +
+  "[id*=cookie], [class*=consent], .advertisement, .ad, .ads, [class*=advert], " +
+  "[data-ad], .promo, .newsletter, .subscribe, .signup, .social, .share, " +
+  ".sharing, .related, .related-posts, .comments, #comments, .disqus, " +
+  ".edit-section, .mw-editsection, .mw-jump-link, .noprint, .modal, .popup, " +
+  ".lightbox, [aria-hidden=true], [hidden]";
 
 // Main-content containers, in priority order. Selecting one of these preserves
 // the heading structure (h2/h3) that Readability tends to strip — and that
@@ -81,8 +158,14 @@ const MAIN_SELECTORS = [
   "main",
   "article",
   "[role=main]",
+  "[itemprop=articleBody]",
   ".mw-parser-output", // Wikipedia / MediaWiki
   ".markdown-body", // GitHub
+  ".theme-doc-markdown", // Docusaurus
+  ".md-content__inner", // MkDocs Material
+  ".rst-content", // Sphinx / Read the Docs
+  ".devsite-article-body", // Google developer docs
+  ".document", // Sphinx
   ".prose", // common docs (Tailwind)
   "#content",
   "#main-content",
@@ -150,8 +233,25 @@ function adaptiveTtlMs(versions: Version[], spaPartial: boolean): number {
   return Math.max(TTL_MIN_MS, Math.min(TTL_MAX_MS, Math.round(mean / 2)));
 }
 
+// Cheap pre-parse trim: strip the heaviest non-content BEFORE JSDOM sees it.
+// JSDOM is the hot path (tens to hundreds of ms / page); removing scripts,
+// styles, SVG, comments, inline style attrs and base64 image payloads up front
+// shrinks the parse and the memory it holds — pure speed + cleanliness, no
+// effect on extracted text.
+function preTrimHtml(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<svg\b[\s\S]*?<\/svg>/gi, "")
+    .replace(/<template\b[\s\S]*?<\/template>/gi, "")
+    .replace(/\ssrc=("|')data:[^"']*\1/gi, ' src=""')
+    .replace(/\sstyle=("|')[^"']*\1/gi, "");
+}
+
 function htmlToDistilledMarkdown(html: string, url: string): string {
-  const dom = new JSDOM(html, { url });
+  const dom = new JSDOM(preTrimHtml(html), { url });
   const doc = dom.window.document;
   doc.querySelectorAll(NOISE_SELECTORS).forEach((el) => el.remove());
 
@@ -177,7 +277,11 @@ function htmlToDistilledMarkdown(html: string, url: string): string {
   if (!contentHtml) contentHtml = doc.body?.innerHTML ?? html;
 
   const md = turndown.turndown(contentHtml);
-  return md.replace(/\n{3,}/g, "\n\n").trim();
+  return md
+    .replace(/[ \t]+$/gm, "") // trailing whitespace per line
+    .replace(/\n{3,}/g, "\n\n") // collapse blank-line runs
+    .replace(/(\[]\([^)]*\)\s*)+/g, "") // drop empty-text links left behind
+    .trim();
 }
 
 function clipToBudget(markdown: string, tokenBudget?: number): string {
