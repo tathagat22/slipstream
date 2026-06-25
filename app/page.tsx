@@ -182,6 +182,15 @@ export default function Home() {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  // Hit rate is a function of ecosystem traffic overlap, not Slipstream's value
+  // — on a young cache it's misleadingly low. The honest headline is how much
+  // every fetch saves (distillation pays off on misses too); raw hits/misses
+  // stay visible in the detail row below.
+  const calls = (stats?.hits ?? 0) + (stats?.misses ?? 0);
+  const perFetch = calls ? Math.round((stats?.tokensSaved ?? 0) / calls) : 0;
+  const perFetchLabel =
+    perFetch >= 1000 ? `${(perFetch / 1000).toFixed(perFetch >= 10000 ? 0 : 1)}K` : `${perFetch}`;
+
   return (
     <>
       <Scene />
@@ -250,22 +259,22 @@ export default function Home() {
             <div className="mk">books of text distilled away</div>
           </div>
           <div className="mini">
-            <div className="mn">{((stats?.hitRate ?? 0) * 100).toFixed(0)}%</div>
-            <div className="mk">cache hit rate</div>
+            <div className="mn">{perFetchLabel}</div>
+            <div className="mk">avg tokens saved / fetch</div>
           </div>
         </div>
         <div className="stat-row">
           <div className="stat">
             <div className="n">{(stats?.pagesCached ?? 0).toLocaleString()}</div>
-            <div className="k">pages cached</div>
+            <div className="k">pages distilled for everyone</div>
           </div>
           <div className="stat">
             <div className="n">{(stats?.hits ?? 0).toLocaleString()}</div>
-            <div className="k">cache hits</div>
+            <div className="k">cache reuses</div>
           </div>
           <div className="stat">
-            <div className="n">{(stats?.misses ?? 0).toLocaleString()}</div>
-            <div className="k">cold crawls</div>
+            <div className="n">{calls.toLocaleString()}</div>
+            <div className="k">agent fetches served</div>
           </div>
         </div>
       </section>
