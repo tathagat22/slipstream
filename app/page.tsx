@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { FAQ } from "@/lib/faq";
+import { INSTALL } from "@/lib/install";
+import MobiusHero from "./MobiusHero";
 
 type ZMember = { member: string; score: number };
 type Activity = { domain: string; saved: number; hit: boolean; at: number };
@@ -27,12 +30,16 @@ type Stats = {
   recentNotes: Note[];
 };
 
-const MCP_URL = "https://slipstream-pi.vercel.app/api/mcp";
+const REDUCE_MOTION =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function useStats() {
   const [stats, setStats] = useState<Stats | null>(null);
   useEffect(() => {
     let alive = true;
+    let id: ReturnType<typeof setInterval> | undefined;
     const tick = async () => {
       try {
         const r = await fetch("/api/stats", { cache: "no-store" });
@@ -42,38 +49,93 @@ function useStats() {
         /* ignore transient errors */
       }
     };
-    tick();
-    const id = setInterval(tick, 2000);
+    // Poll every 5s, but only while the tab is visible — a backgrounded tab
+    // burns network/battery for zero user value.
+    const start = () => {
+      if (id) return;
+      tick();
+      id = setInterval(tick, 5000);
+    };
+    const stop = () => {
+      if (id) {
+        clearInterval(id);
+        id = undefined;
+      }
+    };
+    const onVisibility = () =>
+      document.visibilityState === "hidden" ? stop() : start();
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       alive = false;
-      clearInterval(id);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
   return stats;
 }
 
-/** Smoothly animate a number toward its target value. */
-function useCountUp(target: number) {
+/**
+ * Animate a number toward its target over a fixed duration with a cubic
+ * ease-out, picking up from wherever the previous animation left off so live
+ * deltas tick forward rather than restarting from zero. Cancels in flight when
+ * the target changes, so polls never stack overlapping RAF chains.
+ */
+function useCountUp(target: number, duration = 900) {
   const [display, setDisplay] = useState(0);
-  const ref = useRef(0);
+  const fromRef = useRef(0);
   useEffect(() => {
+    if (REDUCE_MOTION) {
+      fromRef.current = target;
+      setDisplay(target);
+      return;
+    }
+    const from = fromRef.current;
+    const start = performance.now();
     let raf = 0;
-    const step = () => {
-      const cur = ref.current;
-      const diff = target - cur;
-      if (Math.abs(diff) < 1) {
-        ref.current = target;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3); // expo-ish ease-out
+      const val = from + (target - from) * eased;
+      fromRef.current = val;
+      setDisplay(Math.round(val));
+      if (t < 1) {
+        raf = requestAnimationFrame(step);
+      } else {
+        fromRef.current = target;
         setDisplay(target);
-        return;
       }
-      ref.current = cur + diff * 0.12;
-      setDisplay(Math.round(ref.current));
-      raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [target]);
+  }, [target, duration]);
   return display;
+}
+
+/** Reveal elements with `.reveal` / `.reveal-stagger` as they enter the viewport. */
+function useScrollReveal() {
+  useEffect(() => {
+    const els = Array.from(
+      document.querySelectorAll<HTMLElement>(".reveal, .reveal-stagger"),
+    );
+    if (REDUCE_MOTION || !("IntersectionObserver" in window)) {
+      els.forEach((el) => el.classList.add("in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
 }
 
 function ago(ts: number): string {
@@ -83,35 +145,23 @@ function ago(ts: number): string {
   return `${Math.floor(s / 3600)}h ago`;
 }
 
-const INSTALL: Record<string, { label: string; code: string }> = {
-  "claude-code": {
-    label: "Claude Code",
-    code: `claude mcp add --transport http slipstream ${MCP_URL}`,
-  },
-  cursor: {
-    label: "Cursor / Windsurf / VS Code",
-    code: `{
-  "mcpServers": {
-    "slipstream": { "url": "${MCP_URL}" }
-  }
-}`,
-  },
-  "claude-desktop": {
-    label: "Claude Desktop",
-    code: `{
-  "mcpServers": {
-    "slipstream": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "${MCP_URL}"]
-    }
-  }
-}`,
-  },
-};
-
 export default function Home() {
   const stats = useStats();
   const saved = useCountUp(stats?.tokensSaved ?? 0);
+  useScrollReveal();
+  const h1Ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    // The hero loop dispatches "slip-distill" each time a token distills —
+    // briefly glow the headline cyan so the H1 "feels" it.
+    const onDistill = () => {
+      const el = h1Ref.current;
+      if (!el) return;
+      el.classList.add("distill");
+      window.setTimeout(() => el.classList.remove("distill"), 420);
+    };
+    window.addEventListener("slip-distill", onDistill);
+    return () => window.removeEventListener("slip-distill", onDistill);
+  }, []);
   const [tab, setTab] = useState<keyof typeof INSTALL>("claude-code");
   const [copied, setCopied] = useState(false);
   const copy = (text: string) => {
@@ -137,11 +187,19 @@ export default function Home() {
       </header>
 
       <span className="eyebrow">The shared cache for AI agents</span>
-      <h1>
+      <h1 ref={h1Ref}>
         Every agent makes the
         <br />
         web cheaper for the next.
       </h1>
+      <h2 className="subhead">
+        A shared <strong>MCP cache</strong> that cuts agent web-fetch tokens{" "}
+        <strong>73–89%</strong> — distill a URL once, every agent after drafts
+        in the slipstream.
+      </h2>
+
+      <MobiusHero activity={stats?.activity} />
+
       <p className="lede">
         AI agents re-crawl the same pages millions of times a day, burning
         thousands of tokens to extract a few hundred. Slipstream distills a URL{" "}
@@ -153,7 +211,7 @@ export default function Home() {
         web</strong> — what changed since the version it cited, for ~0 tokens.
       </p>
 
-      <section className="counter">
+      <section className="counter reveal">
         <div className="label">
           <span className="dot" /> Tokens saved for agents worldwide
         </div>
@@ -193,7 +251,7 @@ export default function Home() {
         )}
       </section>
 
-      <div className="twocol">
+      <div className="twocol reveal">
         <section>
           <h2>Live activity</h2>
           <div className="feed">
@@ -235,7 +293,7 @@ export default function Home() {
         </section>
       </div>
 
-      <section className="hive">
+      <section className="hive reveal">
         <h2>
           The hive brain · {(stats?.notesCount ?? 0).toLocaleString()} notes
           agents left for each other
@@ -264,8 +322,8 @@ export default function Home() {
         </div>
       </section>
 
-      <h2>How it works</h2>
-      <div className="how">
+      <h2 className="reveal">How it works</h2>
+      <div className="how reveal-stagger">
         <div className="card">
           <div className="step">1 · Call</div>
           <p>
@@ -289,8 +347,8 @@ export default function Home() {
         </div>
       </div>
 
-      <h2>Slipstream vs. the alternatives</h2>
-      <div className="compare">
+      <h2 className="reveal">Slipstream vs. the alternatives</h2>
+      <div className="compare reveal-stagger">
         <div className="crow head">
           <span></span>
           <span>Raw fetch</span>
@@ -313,8 +371,8 @@ export default function Home() {
         ))}
       </div>
 
-      <h2>The toolkit · 8 MCP tools</h2>
-      <div className="tools">
+      <h2 className="reveal">The toolkit · 8 MCP tools</h2>
+      <div className="tools reveal-stagger">
         {[
           {
             group: "Efficiency",
@@ -357,8 +415,8 @@ export default function Home() {
         ))}
       </div>
 
-      <h2>Install in 30 seconds</h2>
-      <div className="install">
+      <h2 className="reveal">Install in 30 seconds</h2>
+      <div className="install reveal">
         <div className="tabs">
           {Object.entries(INSTALL).map(([key, v]) => (
             <button
@@ -385,9 +443,19 @@ export default function Home() {
         </p>
       </div>
 
+      <h2 className="reveal">Frequently asked questions</h2>
+      <div className="faq reveal">
+        {FAQ.map((f) => (
+          <details className="faqitem" key={f.q}>
+            <summary>{f.q}</summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
+      </div>
+
       <footer>
         <span className="dot" /> Slipstream · a shared cache that gets cheaper for
-        everyone the more it’s used. · <a href="/docs">docs</a> · <a href="https://github.com/tathagat22/slipstream">source</a>
+        everyone the more it’s used. · <a href="/install">install</a> · <a href="/docs">docs</a> · <a href="/llms.txt">llms.txt</a> · <a href="https://github.com/tathagat22/slipstream">source</a>
       </footer>
     </main>
   );

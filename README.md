@@ -15,6 +15,12 @@
 </p>
 
 <p>
+  <a href="https://github.com/tathagat22/slipstream/stargazers"><img src="https://img.shields.io/github/stars/tathagat22/slipstream?style=flat-square&color=fbbf24" alt="GitHub stars"></a>
+  <a href="https://github.com/tathagat22/slipstream/commits"><img src="https://img.shields.io/github/last-commit/tathagat22/slipstream?style=flat-square&color=64748b" alt="Last commit"></a>
+  <img src="https://img.shields.io/badge/tokens%20saved-73--89%25-5eead4?style=flat-square" alt="73-89% fewer tokens">
+</p>
+
+<p>
   <b>English</b> ·
   <a href="./README.ko.md">한국어</a> ·
   <a href="./README.ja.md">日本語</a> ·
@@ -80,6 +86,21 @@ That's it — your agent now has `cached_fetch`, `whats_new`, the hive-brain not
 | Wikipedia article | 41,441 | 11,206 | **73%** |
 
 Savings are denominated in tokens — i.e. in dollars. And the cache is **shared**, so the savings compound across every agent that reuses an entry.
+
+## How Slipstream compares
+
+Clean markdown is table stakes — per-call cleaners already do it. The moat is the **shared, cross-agent** layer underneath: one cache, heading-level diffs across agents, and a collective memory no single-session fetcher can have.
+
+| | Raw `WebFetch` | Jina Reader | Firecrawl | **Slipstream** |
+|---|:---:|:---:|:---:|:---:|
+| Token-optimized markdown | ✗ | ✓ | ✓ | **✓** |
+| **Shared** cross-agent cache | ✗ | ✗ | ✗ | **✓** |
+| Heading-level diffs across agents | ✗ | ✗ | ✗ | **✓** |
+| Collective notes (hive brain) | ✗ | ✗ | ✗ | **✓** |
+| Cutoff-aware `whats_new` | ✗ | ✗ | ✗ | **✓** |
+| Don't-bother index (SPA/paywall traps) | ✗ | ✗ | ✗ | **✓** |
+| Hosted · zero-install · free | ✗ | ~ | ✗ | **✓** |
+| One-line MCP install | ✗ | ✗ | ~ | **✓** |
 
 ## How it works
 

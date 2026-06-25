@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Slipstream — Documentation",
+  title: "Docs — install & tool reference",
   description:
     "How to install and use Slipstream, the shared distillation cache for AI agents. Tool reference, install guides, and how it works.",
+  alternates: { canonical: "/docs" },
 };
 
+const SITE = "https://slipstream-pi.vercel.app";
 const ENDPOINT = "https://slipstream-pi.vercel.app/api/mcp";
+
+const BREADCRUMB_LD = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: SITE },
+    { "@type": "ListItem", position: 2, name: "Docs", item: `${SITE}/docs` },
+  ],
+};
 
 const TOOLS: { name: string; sig: string; body: string }[] = [
   {
@@ -286,8 +297,15 @@ export default function Docs() {
       <footer>
         <span className="dot" /> Slipstream ·{" "}
         <a href="/">home</a> ·{" "}
+        <a href="/install">install</a> ·{" "}
+        <a href="/llms.txt">llms.txt</a> ·{" "}
         <a href="https://github.com/tathagat22/slipstream">source</a>
       </footer>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(BREADCRUMB_LD) }}
+      />
     </main>
   );
 }
