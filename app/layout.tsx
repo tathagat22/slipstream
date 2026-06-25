@@ -1,6 +1,20 @@
 import type { Metadata } from "next";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { FAQ } from "@/lib/faq";
+import SmoothScroll from "@/components/SmoothScroll";
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-display",
+});
+const geist = Geist({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-mono",
+});
 
 const SITE = "https://slipstream-pi.vercel.app";
 const REPO = "https://github.com/tathagat22/slipstream";
@@ -101,9 +115,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${fraunces.variable} ${geist.variable} ${geistMono.variable}`}
+    >
       <body>
+        <SmoothScroll />
         {children}
+        <div className="grain" aria-hidden="true" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_LD) }}

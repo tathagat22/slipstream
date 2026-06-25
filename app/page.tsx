@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { FAQ } from "@/lib/faq";
 import { INSTALL } from "@/lib/install";
-import MobiusHero from "./MobiusHero";
+import { flow } from "@/lib/store";
+
+const Scene = dynamic(() => import("@/components/Scene"), { ssr: false });
+const Craft = dynamic(() => import("@/components/Craft"), { ssr: false });
 
 type ZMember = { member: string; score: number };
 type Activity = { domain: string; saved: number; hit: boolean; at: number };
@@ -162,6 +166,13 @@ export default function Home() {
     window.addEventListener("slip-distill", onDistill);
     return () => window.removeEventListener("slip-distill", onDistill);
   }, []);
+  // Fire a pulse down the current whenever the live tokens-saved counter ticks up.
+  const prevSaved = useRef(0);
+  useEffect(() => {
+    const ts = stats?.tokensSaved ?? 0;
+    if (prevSaved.current && ts > prevSaved.current) flow.pulse = 1;
+    prevSaved.current = ts;
+  }, [stats?.tokensSaved]);
   const [tab, setTab] = useState<keyof typeof INSTALL>("claude-code");
   const [copied, setCopied] = useState(false);
   const copy = (text: string) => {
@@ -171,7 +182,10 @@ export default function Home() {
   };
 
   return (
-    <main className="wrap">
+    <>
+      <Scene />
+      <Craft />
+      <main className="wrap">
       <header className="top">
         <span className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -197,8 +211,6 @@ export default function Home() {
         <strong>73–89%</strong> — distill a URL once, every agent after drafts
         in the slipstream.
       </h2>
-
-      <MobiusHero activity={stats?.activity} />
 
       <p className="lede">
         AI agents re-crawl the same pages millions of times a day, burning
@@ -421,7 +433,7 @@ export default function Home() {
           {Object.entries(INSTALL).map(([key, v]) => (
             <button
               key={key}
-              className={`tab ${tab === key ? "on" : ""}`}
+              className={`tab magnetic ${tab === key ? "on" : ""}`}
               onClick={() => setTab(key as keyof typeof INSTALL)}
             >
               {v.label}
@@ -457,6 +469,7 @@ export default function Home() {
         <span className="dot" /> Slipstream · a shared cache that gets cheaper for
         everyone the more it’s used. · <a href="/install">install</a> · <a href="/docs">docs</a> · <a href="/llms.txt">llms.txt</a> · <a href="https://github.com/tathagat22/slipstream">source</a>
       </footer>
-    </main>
+      </main>
+    </>
   );
 }
